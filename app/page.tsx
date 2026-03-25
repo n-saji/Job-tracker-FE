@@ -16,7 +16,12 @@ import {
   toIsoFromDateTimeLocal,
   updateJob,
 } from "@/lib/jobs-api";
-import { JOB_STATUSES, type Job, type JobFormInput, type JobStatus } from "@/lib/job-types";
+import {
+  JOB_STATUSES,
+  type Job,
+  type JobFormInput,
+  type JobStatus,
+} from "@/lib/job-types";
 
 type FormErrors = Partial<Record<keyof JobFormInput | "form", string>>;
 
@@ -36,6 +41,7 @@ const STATUS_LABELS: Record<JobStatus, string> = {
   offer: "Offer",
   rejected: "Rejected",
   withdrawn: "Withdrawn",
+  added: "Added",
 };
 
 const PAGE_LIMIT_OPTIONS = [20, 50, 100];
@@ -74,6 +80,7 @@ function analyticsSeed(): Analytics {
   return {
     total: 0,
     byStatus: {
+      added: 0,
       applied: 0,
       interview: 0,
       offer: 0,
@@ -106,6 +113,9 @@ function getStatusBadgeClass(status: JobStatus): string {
   if (status === "rejected") {
     return "bg-rose-100 text-rose-700 border border-rose-200";
   }
+  if (status === "added") {
+    return "bg-green-100 text-green-800 border border-green-200";
+  }
   return "bg-slate-100 text-slate-700 border border-slate-200";
 }
 
@@ -116,6 +126,7 @@ export default function Home() {
   const [total, setTotal] = useState(0);
   const [statusFilter, setStatusFilter] = useState<JobStatus | "">("");
   const [companyFilter, setCompanyFilter] = useState("");
+  const [locationFilter, setLocationFilter] = useState("");
   const [loadingJobs, setLoadingJobs] = useState(true);
   const [jobsError, setJobsError] = useState("");
 
@@ -150,6 +161,7 @@ export default function Home() {
         limit,
         status: statusFilter,
         company: companyFilter,
+        location: locationFilter,
       });
       setJobs(response.data);
       setTotal(response.total);
@@ -164,14 +176,16 @@ export default function Home() {
     } finally {
       setLoadingJobs(false);
     }
-  }, [companyFilter, limit, page, statusFilter]);
+  }, [companyFilter, limit, locationFilter, page, statusFilter]);
 
   const loadAnalytics = useCallback(async () => {
     setLoadingAnalytics(true);
     try {
       const [overall, ...statusBreakdown] = await Promise.all([
         listJobs({ page: 1, limit: 1 }),
-        ...JOB_STATUSES.map((status) => listJobs({ page: 1, limit: 1, status })),
+        ...JOB_STATUSES.map((status) =>
+          listJobs({ page: 1, limit: 1, status }),
+        ),
       ]);
 
       const byStatus = JOB_STATUSES.reduce(
@@ -383,7 +397,11 @@ export default function Home() {
     }
 
     const applyLinkError = await validateApplyLinkUniqueness(form.apply_link);
-    if (applyLinkError && applyLinkError !== "Unable to verify apply link now. You can still submit.") {
+    if (
+      applyLinkError &&
+      applyLinkError !==
+        "Unable to verify apply link now. You can still submit."
+    ) {
       setFormErrors((prev) => ({ ...prev, apply_link: applyLinkError }));
       return;
     }
@@ -443,6 +461,19 @@ export default function Home() {
     }
   }
 
+  function applyStatusFilter(nextStatus: JobStatus | "") {
+    setPage(1);
+    setStatusFilter(nextStatus);
+  }
+
+  function getSummaryCardClass(cardStatus: JobStatus | ""): string {
+    const isActive = statusFilter === cardStatus;
+    if (isActive) {
+      return "rounded-2xl border border-cyan-300 bg-cyan-50 p-5 text-left shadow-sm";
+    }
+    return "rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-cyan-200 hover:bg-cyan-50/40";
+  }
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(120deg,#f8fafc_0%,#f1f5f9_38%,#e2e8f0_100%)] pb-12">
       <div className="pointer-events-none absolute -top-20 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-cyan-300/30 blur-3xl" />
@@ -459,7 +490,10 @@ export default function Home() {
                 Track every role, interview, and offer.
               </h1>
               <p className="mt-2 text-sm text-slate-600">
-                Connected API base URL: <span className="font-semibold text-slate-900">{API_BASE_URL}</span>
+                Connected API base URL:{" "}
+                <span className="font-semibold text-slate-900">
+                  {API_BASE_URL}
+                </span>
               </p>
             </div>
             <button
@@ -485,44 +519,59 @@ export default function Home() {
         )}
 
         <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Total Jobs</p>
+          <button
+            type="button"
+            onClick={() => applyStatusFilter("")}
+            className={getSummaryCardClass("")}
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              Total Jobs
+            </p>
             <p className="mt-3 text-3xl font-semibold text-slate-900">
               {loadingAnalytics ? "..." : analytics.total}
             </p>
-          </article>
+          </button>
           {JOB_STATUSES.slice(0, 2).map((status) => (
-            <article key={status} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <button
+              type="button"
+              key={status}
+              onClick={() => applyStatusFilter(status)}
+              className={getSummaryCardClass(status)}
+            >
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                 {STATUS_LABELS[status]}
               </p>
               <p className="mt-3 text-3xl font-semibold text-slate-900">
                 {loadingAnalytics ? "..." : analytics.byStatus[status]}
               </p>
-            </article>
+            </button>
           ))}
           {JOB_STATUSES.slice(2).map((status) => (
-            <article key={status} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <button
+              type="button"
+              key={status}
+              onClick={() => applyStatusFilter(status)}
+              className={getSummaryCardClass(status)}
+            >
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                 {STATUS_LABELS[status]}
               </p>
               <p className="mt-3 text-3xl font-semibold text-slate-900">
                 {loadingAnalytics ? "..." : analytics.byStatus[status]}
               </p>
-            </article>
+            </button>
           ))}
         </section>
 
         <section className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-xl backdrop-blur sm:p-6">
           <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Status
                 <select
                   value={statusFilter}
                   onChange={(event) => {
-                    setPage(1);
-                    setStatusFilter(event.target.value as JobStatus | "");
+                    applyStatusFilter(event.target.value as JobStatus | "");
                   }}
                   className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 outline-none ring-cyan-300 transition focus:ring"
                 >
@@ -535,7 +584,7 @@ export default function Home() {
                 </select>
               </label>
 
-              <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:col-span-2">
+              <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:col-span-2 lg:col-span-2">
                 Company
                 <input
                   value={companyFilter}
@@ -544,6 +593,19 @@ export default function Home() {
                     setCompanyFilter(event.target.value);
                   }}
                   placeholder="Search company"
+                  className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none ring-cyan-300 transition focus:ring"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:col-span-2 lg:col-span-2">
+                Location
+                <input
+                  value={locationFilter}
+                  onChange={(event) => {
+                    setPage(1);
+                    setLocationFilter(event.target.value);
+                  }}
+                  placeholder="Search location"
                   className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none ring-cyan-300 transition focus:ring"
                 />
               </label>
@@ -599,13 +661,19 @@ export default function Home() {
                 <tbody>
                   {loadingJobs ? (
                     <tr>
-                      <td className="px-4 py-8 text-center text-sm text-slate-500" colSpan={5}>
+                      <td
+                        className="px-4 py-8 text-center text-sm text-slate-500"
+                        colSpan={5}
+                      >
                         Loading jobs...
                       </td>
                     </tr>
                   ) : jobs.length === 0 ? (
                     <tr>
-                      <td className="px-4 py-8 text-center text-sm text-slate-500" colSpan={5}>
+                      <td
+                        className="px-4 py-8 text-center text-sm text-slate-500"
+                        colSpan={5}
+                      >
                         No jobs found for the current filters.
                       </td>
                     </tr>
@@ -613,8 +681,12 @@ export default function Home() {
                     jobs.map((job) => (
                       <tr key={job.id} className="border-t border-slate-100">
                         <td className="px-4 py-4 align-top">
-                          <p className="text-sm font-semibold text-slate-900">{job.company_name}</p>
-                          <p className="text-xs text-slate-600">{job.role_title}</p>
+                          <p className="text-sm font-semibold text-slate-900">
+                            {job.company_name}
+                          </p>
+                          <p className="text-xs text-slate-600">
+                            {job.role_title}
+                          </p>
                           <a
                             href={job.apply_link}
                             target="_blank"
@@ -625,14 +697,34 @@ export default function Home() {
                           </a>
                         </td>
                         <td className="px-4 py-4 align-top">
-                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusBadgeClass(job.status)}`}>
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusBadgeClass(job.status)}`}
+                          >
                             {STATUS_LABELS[job.status]}
                           </span>
                         </td>
-                        <td className="px-4 py-4 align-top text-sm text-slate-700">{formatAppliedDate(job.applied_at)}</td>
-                        <td className="px-4 py-4 align-top text-sm text-slate-700">{job.location || "-"}</td>
+                        <td className="px-4 py-4 align-top text-sm text-slate-700">
+                          {formatAppliedDate(job.applied_at)}
+                        </td>
+                        <td className="px-4 py-4 align-top text-sm text-slate-700">
+                          {job.location || "-"}
+                        </td>
                         <td className="px-4 py-4 align-top">
                           <div className="flex gap-2">
+                            {job.resume_link ? (
+                              <a
+                                href={job.resume_link}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:border-emerald-400"
+                              >
+                                Download Resume
+                              </a>
+                            ) : (
+                              <span className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-400">
+                                No Resume
+                              </span>
+                            )}
                             <button
                               type="button"
                               onClick={() => void openEdit(job.id)}
@@ -660,7 +752,10 @@ export default function Home() {
 
           <div className="mt-4 flex items-center justify-between">
             <p className="text-sm text-slate-600">
-              Page <span className="font-semibold text-slate-900">{page}</span> of <span className="font-semibold text-slate-900">{totalPages}</span> ({total} jobs)
+              Page <span className="font-semibold text-slate-900">{page}</span>{" "}
+              of{" "}
+              <span className="font-semibold text-slate-900">{totalPages}</span>{" "}
+              ({total} jobs)
             </p>
             <div className="flex gap-2">
               <button
@@ -673,7 +768,9 @@ export default function Home() {
               </button>
               <button
                 type="button"
-                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                onClick={() =>
+                  setPage((current) => Math.min(totalPages, current + 1))
+                }
                 disabled={page >= totalPages || loadingJobs}
                 className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -693,7 +790,9 @@ export default function Home() {
                   {isCreateMode ? "Create" : "Edit"}
                 </p>
                 <h2 className="text-xl font-semibold text-slate-900">
-                  {isCreateMode ? "New Job Application" : "Update Job Application"}
+                  {isCreateMode
+                    ? "New Job Application"
+                    : "Update Job Application"}
                 </h2>
               </div>
               <button
@@ -705,7 +804,10 @@ export default function Home() {
               </button>
             </div>
 
-            <form onSubmit={(event) => void onSubmitForm(event)} className="space-y-3">
+            <form
+              onSubmit={(event) => void onSubmitForm(event)}
+              className="space-y-3"
+            >
               {formErrors.form && (
                 <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
                   {formErrors.form}
@@ -717,37 +819,69 @@ export default function Home() {
                   Company Name
                   <input
                     value={form.company_name}
-                    onChange={(event) => setForm((prev) => ({ ...prev, company_name: event.target.value }))}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        company_name: event.target.value,
+                      }))
+                    }
                     className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring"
                   />
-                  {formErrors.company_name && <span className="mt-1 block text-xs text-rose-700">{formErrors.company_name}</span>}
+                  {formErrors.company_name && (
+                    <span className="mt-1 block text-xs text-rose-700">
+                      {formErrors.company_name}
+                    </span>
+                  )}
                 </label>
 
                 <label className="text-sm font-medium text-slate-700">
                   Role Title
                   <input
                     value={form.role_title}
-                    onChange={(event) => setForm((prev) => ({ ...prev, role_title: event.target.value }))}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        role_title: event.target.value,
+                      }))
+                    }
                     className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring"
                   />
-                  {formErrors.role_title && <span className="mt-1 block text-xs text-rose-700">{formErrors.role_title}</span>}
+                  {formErrors.role_title && (
+                    <span className="mt-1 block text-xs text-rose-700">
+                      {formErrors.role_title}
+                    </span>
+                  )}
                 </label>
 
                 <label className="text-sm font-medium text-slate-700">
                   Location
                   <input
                     value={form.location}
-                    onChange={(event) => setForm((prev) => ({ ...prev, location: event.target.value }))}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        location: event.target.value,
+                      }))
+                    }
                     className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring"
                   />
-                  {formErrors.location && <span className="mt-1 block text-xs text-rose-700">{formErrors.location}</span>}
+                  {formErrors.location && (
+                    <span className="mt-1 block text-xs text-rose-700">
+                      {formErrors.location}
+                    </span>
+                  )}
                 </label>
 
                 <label className="text-sm font-medium text-slate-700">
                   Status
                   <select
                     value={form.status}
-                    onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value as JobStatus }))}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        status: event.target.value as JobStatus,
+                      }))
+                    }
                     className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring"
                   >
                     {JOB_STATUSES.map((status) => (
@@ -756,21 +890,32 @@ export default function Home() {
                       </option>
                     ))}
                   </select>
-                  {formErrors.status && <span className="mt-1 block text-xs text-rose-700">{formErrors.status}</span>}
+                  {formErrors.status && (
+                    <span className="mt-1 block text-xs text-rose-700">
+                      {formErrors.status}
+                    </span>
+                  )}
                 </label>
 
                 <label className="text-sm font-medium text-slate-700 sm:col-span-2">
                   Apply Link
                   <input
                     value={form.apply_link}
-                    onChange={(event) => setForm((prev) => ({ ...prev, apply_link: event.target.value }))}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        apply_link: event.target.value,
+                      }))
+                    }
                     onBlur={() => {
                       void (async () => {
-                        const applyLinkError = await validateApplyLinkUniqueness(form.apply_link);
+                        const applyLinkError =
+                          await validateApplyLinkUniqueness(form.apply_link);
                         setFormErrors((prev) => ({
                           ...prev,
                           apply_link:
-                            applyLinkError === "Unable to verify apply link now. You can still submit."
+                            applyLinkError ===
+                            "Unable to verify apply link now. You can still submit."
                               ? undefined
                               : applyLinkError || undefined,
                         }));
@@ -780,8 +925,12 @@ export default function Home() {
                     className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring"
                   />
                   <div className="mt-1 flex items-center justify-between text-xs">
-                    <span className="text-rose-700">{formErrors.apply_link}</span>
-                    {checkingApplyLink && <span className="text-slate-500">Checking link...</span>}
+                    <span className="text-rose-700">
+                      {formErrors.apply_link}
+                    </span>
+                    {checkingApplyLink && (
+                      <span className="text-slate-500">Checking link...</span>
+                    )}
                   </div>
                 </label>
 
@@ -789,7 +938,12 @@ export default function Home() {
                   LinkedIn Job URL
                   <input
                     value={form.linkedin_job_url}
-                    onChange={(event) => setForm((prev) => ({ ...prev, linkedin_job_url: event.target.value }))}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        linkedin_job_url: event.target.value,
+                      }))
+                    }
                     placeholder="Optional"
                     className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring"
                   />
@@ -799,7 +953,12 @@ export default function Home() {
                   Resume Link
                   <input
                     value={form.resume_link}
-                    onChange={(event) => setForm((prev) => ({ ...prev, resume_link: event.target.value }))}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        resume_link: event.target.value,
+                      }))
+                    }
                     placeholder="Optional"
                     className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring"
                   />
@@ -809,7 +968,12 @@ export default function Home() {
                   Salary Text
                   <input
                     value={form.salary_text}
-                    onChange={(event) => setForm((prev) => ({ ...prev, salary_text: event.target.value }))}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        salary_text: event.target.value,
+                      }))
+                    }
                     placeholder="Optional"
                     className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring"
                   />
@@ -820,10 +984,19 @@ export default function Home() {
                   <input
                     type="datetime-local"
                     value={form.applied_at}
-                    onChange={(event) => setForm((prev) => ({ ...prev, applied_at: event.target.value }))}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        applied_at: event.target.value,
+                      }))
+                    }
                     className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring"
                   />
-                  {formErrors.applied_at && <span className="mt-1 block text-xs text-rose-700">{formErrors.applied_at}</span>}
+                  {formErrors.applied_at && (
+                    <span className="mt-1 block text-xs text-rose-700">
+                      {formErrors.applied_at}
+                    </span>
+                  )}
                 </label>
               </div>
 
@@ -831,7 +1004,12 @@ export default function Home() {
                 <input
                   type="checkbox"
                   checked={form.is_easy_apply}
-                  onChange={(event) => setForm((prev) => ({ ...prev, is_easy_apply: event.target.checked }))}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      is_easy_apply: event.target.checked,
+                    }))
+                  }
                   className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-cyan-300"
                 />
                 Easy Apply
@@ -843,7 +1021,11 @@ export default function Home() {
                   disabled={submitting}
                   className="h-11 rounded-xl bg-slate-900 px-5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {submitting ? "Saving..." : isCreateMode ? "Create Job" : "Save Changes"}
+                  {submitting
+                    ? "Saving..."
+                    : isCreateMode
+                      ? "Create Job"
+                      : "Save Changes"}
                 </button>
               </div>
             </form>

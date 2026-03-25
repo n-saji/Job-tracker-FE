@@ -1,4 +1,5 @@
 export const JOB_STATUSES = [
+  "added",
   "applied",
   "interview",
   "offer",
@@ -41,6 +42,7 @@ export interface ListJobsParams {
   limit?: number;
   status?: JobStatus | "";
   company?: string;
+  location?: string;
 }
 
 export interface JobFormInput {

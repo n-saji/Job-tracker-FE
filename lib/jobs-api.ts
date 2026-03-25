@@ -8,7 +8,7 @@ import type {
   UpdateJobPayload,
 } from "@/lib/job-types";
 
-const DEFAULT_API_BASE_URL = "http://localhost:8080";
+const DEFAULT_API_BASE_URL = "http://localhost:8000";
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
 
@@ -38,6 +38,9 @@ function buildQuery(params: ListJobsParams): string {
   }
   if (params.company?.trim()) {
     query.set("company", params.company.trim());
+  }
+  if (params.location?.trim()) {
+    query.set("location", params.location.trim());
   }
 
   return query.toString();
@@ -141,7 +144,9 @@ export function formatAppliedDate(iso: string): string {
   }).format(parsed);
 }
 
-export async function listJobs(params: ListJobsParams): Promise<ListJobsResponse> {
+export async function listJobs(
+  params: ListJobsParams,
+): Promise<ListJobsResponse> {
   const query = buildQuery(params);
   const path = query ? `/jobs?${query}` : "/jobs";
   return requestJson<ListJobsResponse>(path);
@@ -158,7 +163,10 @@ export async function createJob(payload: CreateJobPayload): Promise<Job> {
   });
 }
 
-export async function updateJob(id: string, payload: UpdateJobPayload): Promise<Job> {
+export async function updateJob(
+  id: string,
+  payload: UpdateJobPayload,
+): Promise<Job> {
   return requestJson<Job>(`/jobs/${id}`, {
     method: "PUT",
     body: JSON.stringify(payload),
