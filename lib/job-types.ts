@@ -5,9 +5,20 @@ export const JOB_STATUSES = [
   "offer",
   "rejected",
   "withdrawn",
+  "discarded",
 ] as const;
 
 export type JobStatus = (typeof JOB_STATUSES)[number];
+
+export const DISCARD_REASONS = [
+  "high_applicants",
+  "security_clearance",
+  "less_experience",
+  "citizenship",
+  "not_fit",
+] as const;
+
+export type DiscardReason = (typeof DISCARD_REASONS)[number];
 
 export interface Job {
   id: string;
@@ -18,6 +29,7 @@ export interface Job {
   linkedin_job_url: string;
   resume_link: string;
   status: JobStatus;
+  discard_reason?: DiscardReason;
   salary_text: string;
   is_easy_apply: boolean;
   applied_at: string;
@@ -37,10 +49,16 @@ export interface ExistsApplyLinkResponse {
   exists: boolean;
 }
 
+export interface BulkDeleteJobsResponse {
+  deleted_count: number;
+}
+
 export interface ListJobsParams {
   page?: number;
   limit?: number;
   status?: JobStatus | "";
+  discard_reason?: DiscardReason | "";
+  include_discarded?: boolean;
   company?: string;
   location?: string;
 }
@@ -53,6 +71,7 @@ export interface JobFormInput {
   linkedin_job_url: string;
   resume_link: string;
   status: JobStatus;
+  discard_reason: DiscardReason | "";
   salary_text: string;
   is_easy_apply: boolean;
   applied_at: string;

@@ -1,10 +1,18 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  MouseEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import {
   ApiError,
   API_BASE_URL,
+  bulkDeleteJobs,
   createJob,
   deleteJob,
   existsApplyLink,
@@ -17,7 +25,9 @@ import {
   updateJob,
 } from "@/lib/jobs-api";
 import {
+  DISCARD_REASONS,
   JOB_STATUSES,
+  type DiscardReason,
   type Job,
   type JobFormInput,
   type JobStatus,
@@ -36,12 +46,21 @@ type Analytics = {
 };
 
 const STATUS_LABELS: Record<JobStatus, string> = {
+  added: "Added",
   applied: "Applied",
   interview: "Interview",
   offer: "Offer",
   rejected: "Rejected",
   withdrawn: "Withdrawn",
-  added: "Added",
+  discarded: "Discarded",
+};
+
+const DISCARD_REASON_LABELS: Record<DiscardReason, string> = {
+  high_applicants: "High Applicants",
+  security_clearance: "Security Clearance",
+  less_experience: "Less Experience",
+  citizenship: "Citizenship",
+  not_fit: "Not Fit",
 };
 
 const PAGE_LIMIT_OPTIONS = [20, 50, 100];
@@ -55,6 +74,7 @@ function buildEmptyForm(): JobFormInput {
     linkedin_job_url: "",
     resume_link: "",
     status: "applied",
+    discard_reason: "",
     salary_text: "",
     is_easy_apply: false,
     applied_at: "",
@@ -70,6 +90,7 @@ function formFromJob(job: Job): JobFormInput {
     linkedin_job_url: job.linkedin_job_url,
     resume_link: job.resume_link,
     status: job.status,
+    discard_reason: job.discard_reason ?? "",
     salary_text: job.salary_text,
     is_easy_apply: job.is_easy_apply,
     applied_at: toDateTimeLocalValue(job.applied_at),
@@ -86,6 +107,7 @@ function analyticsSeed(): Analytics {
       offer: 0,
       rejected: 0,
       withdrawn: 0,
+      discarded: 0,
     },
   };
 }
@@ -116,6 +138,9 @@ function getStatusBadgeClass(status: JobStatus): string {
   if (status === "added") {
     return "bg-green-100 text-green-800 border border-green-200";
   }
+  if (status === "discarded") {
+    return "bg-orange-100 text-orange-800 border border-orange-200";
+  }
   return "bg-slate-100 text-slate-700 border border-slate-200";
 }
 
@@ -124,7 +149,11 @@ export default function Home() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [total, setTotal] = useState(0);
+  const [showDiscardedJobs, setShowDiscardedJobs] = useState(false);
   const [statusFilter, setStatusFilter] = useState<JobStatus | "">("");
+  const [discardReasonFilter, setDiscardReasonFilter] = useState<
+    DiscardReason | ""
+  >("");
   const [companyFilter, setCompanyFilter] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
   const [loadingJobs, setLoadingJobs] = useState(true);
@@ -144,6 +173,11 @@ export default function Home() {
   const [submitting, setSubmitting] = useState(false);
   const [checkingApplyLink, setCheckingApplyLink] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [applyConfirmJob, setApplyConfirmJob] = useState<Job | null>(null);
+  const [markingAppliedId, setMarkingAppliedId] = useState<string | null>(null);
+  const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const totalPages = useMemo(() => {
     if (!total) {
@@ -159,7 +193,9 @@ export default function Home() {
       const response = await listJobs({
         page,
         limit,
+        include_discarded: showDiscardedJobs,
         status: statusFilter,
+        discard_reason: statusFilter === "discarded" ? discardReasonFilter : "",
         company: companyFilter,
         location: locationFilter,
       });
@@ -176,7 +212,15 @@ export default function Home() {
     } finally {
       setLoadingJobs(false);
     }
-  }, [companyFilter, limit, locationFilter, page, statusFilter]);
+  }, [
+    companyFilter,
+    discardReasonFilter,
+    limit,
+    locationFilter,
+    page,
+    showDiscardedJobs,
+    statusFilter,
+  ]);
 
   const loadAnalytics = useCallback(async () => {
     setLoadingAnalytics(true);
@@ -194,11 +238,13 @@ export default function Home() {
           return acc;
         },
         {
+          added: 0,
           applied: 0,
           interview: 0,
           offer: 0,
           rejected: 0,
           withdrawn: 0,
+          discarded: 0,
         } as Record<JobStatus, number>,
       );
 
@@ -220,6 +266,12 @@ export default function Home() {
   useEffect(() => {
     void loadAnalytics();
   }, [loadAnalytics]);
+
+  useEffect(() => {
+    setSelectedJobIds((prev) =>
+      prev.filter((id) => jobs.some((job) => job.id === id)),
+    );
+  }, [jobs]);
 
   const refreshAll = useCallback(async () => {
     await Promise.all([loadJobs(), loadAnalytics()]);
@@ -287,6 +339,16 @@ export default function Home() {
       nextErrors.status = "Status is invalid.";
     }
 
+    if (value.status === "discarded") {
+      if (
+        !value.discard_reason ||
+        !DISCARD_REASONS.includes(value.discard_reason)
+      ) {
+        nextErrors.discard_reason =
+          "Discard reason is required for discarded jobs.";
+      }
+    }
+
     if (!value.applied_at) {
       nextErrors.applied_at = "Applied date and time is required.";
     } else if (!toIsoFromDateTimeLocal(value.applied_at)) {
@@ -329,6 +391,7 @@ export default function Home() {
       linkedin_job_url: value.linkedin_job_url.trim(),
       resume_link: value.resume_link.trim(),
       status: value.status,
+      discard_reason: value.status === "discarded" ? value.discard_reason : "",
       salary_text: value.salary_text.trim(),
       is_easy_apply: value.is_easy_apply,
       applied_at: toIsoFromDateTimeLocal(value.applied_at),
@@ -347,6 +410,7 @@ export default function Home() {
       linkedin_job_url: value.linkedin_job_url.trim(),
       resume_link: value.resume_link.trim(),
       status: value.status,
+      discard_reason: value.status === "discarded" ? value.discard_reason : "",
       salary_text: value.salary_text.trim(),
       is_easy_apply: value.is_easy_apply,
       applied_at: nextAppliedAt,
@@ -372,6 +436,9 @@ export default function Home() {
     }
     if (withTrim.status !== current.status) {
       payload.status = withTrim.status;
+    }
+    if ((withTrim.discard_reason || "") !== (current.discard_reason || "")) {
+      payload.discard_reason = withTrim.discard_reason;
     }
     if (withTrim.salary_text !== current.salary_text) {
       payload.salary_text = withTrim.salary_text;
@@ -461,9 +528,90 @@ export default function Home() {
     }
   }
 
-  function applyStatusFilter(nextStatus: JobStatus | "") {
+  function toggleJobSelection(id: string) {
+    setSelectedJobIds((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((existing) => existing !== id);
+      }
+      return [...prev, id];
+    });
+  }
+
+  async function onConfirmBulkDelete() {
+    if (selectedJobIds.length < 2) {
+      return;
+    }
+
+    setBulkDeleting(true);
+    setNotice(null);
+    try {
+      const deletedCount = await bulkDeleteJobs(selectedJobIds);
+      setNotice({
+        kind: "success",
+        message: `${deletedCount} job application(s) deleted.`,
+      });
+      setSelectedJobIds([]);
+      setShowBulkDeleteConfirm(false);
+      await refreshAll();
+    } catch (error) {
+      setNotice({ kind: "error", message: getApiMessage(error) });
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
+  function onApplyLinkClick(event: MouseEvent<HTMLAnchorElement>, job: Job) {
+    event.preventDefault();
+    window.open(job.apply_link, "_blank", "noopener,noreferrer");
+    setApplyConfirmJob(job);
+  }
+
+  async function onConfirmApplied() {
+    if (!applyConfirmJob) {
+      return;
+    }
+
+    setNotice(null);
+    setMarkingAppliedId(applyConfirmJob.id);
+    try {
+      await updateJob(applyConfirmJob.id, {
+        status: "applied",
+        applied_at: new Date().toISOString(),
+        discard_reason: "",
+      });
+      setNotice({
+        kind: "success",
+        message: "Job marked as applied with current date and time.",
+      });
+      setApplyConfirmJob(null);
+      await refreshAll();
+    } catch (error) {
+      setNotice({ kind: "error", message: getApiMessage(error) });
+    } finally {
+      setMarkingAppliedId(null);
+    }
+  }
+
+  function applyStatusFilter(
+    nextStatus: JobStatus | "",
+    source: "card" | "control" = "control",
+  ) {
+    const effectiveShowDiscarded =
+      source === "card" ? nextStatus === "discarded" : showDiscardedJobs;
+
+    if (source === "card") {
+      setShowDiscardedJobs(effectiveShowDiscarded);
+    }
+
+    if (!effectiveShowDiscarded && nextStatus === "discarded") {
+      return;
+    }
+
     setPage(1);
     setStatusFilter(nextStatus);
+    if (nextStatus !== "discarded") {
+      setDiscardReasonFilter("");
+    }
   }
 
   function getSummaryCardClass(cardStatus: JobStatus | ""): string {
@@ -521,7 +669,7 @@ export default function Home() {
         <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <button
             type="button"
-            onClick={() => applyStatusFilter("")}
+            onClick={() => applyStatusFilter("", "card")}
             className={getSummaryCardClass("")}
           >
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
@@ -535,7 +683,7 @@ export default function Home() {
             <button
               type="button"
               key={status}
-              onClick={() => applyStatusFilter(status)}
+              onClick={() => applyStatusFilter(status, "card")}
               className={getSummaryCardClass(status)}
             >
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
@@ -550,7 +698,7 @@ export default function Home() {
             <button
               type="button"
               key={status}
-              onClick={() => applyStatusFilter(status)}
+              onClick={() => applyStatusFilter(status, "card")}
               className={getSummaryCardClass(status)}
             >
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
@@ -564,52 +712,105 @@ export default function Home() {
         </section>
 
         <section className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-xl backdrop-blur sm:p-6">
-          <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-              <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Status
+          <div className="mb-5 flex flex-wrap items-end gap-3 justify-around">
+            <label className="flex min-w-[160px] flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Status
+              <select
+                value={statusFilter}
+                onChange={(event) => {
+                  applyStatusFilter(event.target.value as JobStatus | "");
+                }}
+                className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 outline-none ring-cyan-300 transition focus:ring"
+              >
+                <option value="">All statuses</option>
+                {JOB_STATUSES.filter(
+                  (status) => showDiscardedJobs || status !== "discarded",
+                ).map((status) => (
+                  <option key={status} value={status}>
+                    {STATUS_LABELS[status]}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {showDiscardedJobs && statusFilter === "discarded" && (
+              <label className="flex min-w-[180px] flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Discard Reason
                 <select
-                  value={statusFilter}
+                  value={discardReasonFilter}
                   onChange={(event) => {
-                    applyStatusFilter(event.target.value as JobStatus | "");
+                    setPage(1);
+                    setDiscardReasonFilter(
+                      event.target.value as DiscardReason | "",
+                    );
                   }}
                   className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 outline-none ring-cyan-300 transition focus:ring"
                 >
-                  <option value="">All statuses</option>
-                  {JOB_STATUSES.map((status) => (
-                    <option key={status} value={status}>
-                      {STATUS_LABELS[status]}
+                  <option value="">All reasons</option>
+                  {DISCARD_REASONS.map((reason) => (
+                    <option key={reason} value={reason}>
+                      {DISCARD_REASON_LABELS[reason]}
                     </option>
                   ))}
                 </select>
               </label>
+            )}
 
-              <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:col-span-2 lg:col-span-2">
-                Company
-                <input
-                  value={companyFilter}
-                  onChange={(event) => {
-                    setPage(1);
-                    setCompanyFilter(event.target.value);
-                  }}
-                  placeholder="Search company"
-                  className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none ring-cyan-300 transition focus:ring"
-                />
-              </label>
+            <label className="flex min-w-[190px] flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Company
+              <input
+                value={companyFilter}
+                onChange={(event) => {
+                  setPage(1);
+                  setCompanyFilter(event.target.value);
+                }}
+                placeholder="Search company"
+                className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none ring-cyan-300 transition focus:ring"
+              />
+            </label>
 
-              <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:col-span-2 lg:col-span-2">
-                Location
-                <input
-                  value={locationFilter}
-                  onChange={(event) => {
-                    setPage(1);
-                    setLocationFilter(event.target.value);
-                  }}
-                  placeholder="Search location"
-                  className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none ring-cyan-300 transition focus:ring"
+            <label className="flex min-w-[190px] flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Location
+              <input
+                value={locationFilter}
+                onChange={(event) => {
+                  setPage(1);
+                  setLocationFilter(event.target.value);
+                }}
+                placeholder="Search location"
+                className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none ring-cyan-300 transition focus:ring"
+              />
+            </label>
+
+            <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Show Discarded
+              <button
+                type="button"
+                role="switch"
+                aria-checked={showDiscardedJobs}
+                onClick={() => {
+                  const checked = !showDiscardedJobs;
+                  setPage(1);
+                  setShowDiscardedJobs(checked);
+
+                  if (!checked) {
+                    setDiscardReasonFilter("");
+                    if (statusFilter === "discarded") {
+                      setStatusFilter("");
+                    }
+                  }
+                }}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
+                  showDiscardedJobs ? "bg-cyan-600" : "bg-slate-300"
+                }`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${
+                    showDiscardedJobs ? "translate-x-5" : "translate-x-1"
+                  }`}
                 />
-              </label>
-            </div>
+              </button>
+            </label>
 
             <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
               Page size
@@ -630,6 +831,45 @@ export default function Home() {
             </label>
           </div>
 
+          {selectedJobIds.length >= 1 && (
+            <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-sm font-medium text-slate-700">
+                {selectedJobIds.length} jobs selected
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowBulkDeleteConfirm(true)}
+                  className="inline-flex h-9 items-center gap-1 rounded-lg border border-rose-200 px-3 text-sm font-semibold text-rose-700 transition hover:border-rose-400"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="h-4 w-4"
+                    aria-hidden="true"
+                  >
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4h8v2" />
+                    <path d="M19 6l-1 14H6L5 6" />
+                    <path d="M10 11v6" />
+                    <path d="M14 11v6" />
+                  </svg>
+                  Delete
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedJobIds([])}
+                  className="h-9 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-slate-500"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          )}
+
           {jobsError && (
             <p className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
               {jobsError}
@@ -641,6 +881,9 @@ export default function Home() {
               <table className="min-w-full border-collapse">
                 <thead className="bg-slate-100/70">
                   <tr>
+                    <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-[0.15em] text-slate-500">
+                      Select
+                    </th>
                     <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.15em] text-slate-500">
                       Company & Role
                     </th>
@@ -663,7 +906,7 @@ export default function Home() {
                     <tr>
                       <td
                         className="px-4 py-8 text-center text-sm text-slate-500"
-                        colSpan={5}
+                        colSpan={6}
                       >
                         Loading jobs...
                       </td>
@@ -672,7 +915,7 @@ export default function Home() {
                     <tr>
                       <td
                         className="px-4 py-8 text-center text-sm text-slate-500"
-                        colSpan={5}
+                        colSpan={6}
                       >
                         No jobs found for the current filters.
                       </td>
@@ -680,6 +923,15 @@ export default function Home() {
                   ) : (
                     jobs.map((job) => (
                       <tr key={job.id} className="border-t border-slate-100">
+                        <td className="h-full w-full px-4 py-4 flex justify-center align-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedJobIds.includes(job.id)}
+                            onChange={() => toggleJobSelection(job.id)}
+                            className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-cyan-300"
+                            aria-label={`Select ${job.company_name} ${job.role_title}`}
+                          />
+                        </td>
                         <td className="px-4 py-4 align-top">
                           <p className="text-sm font-semibold text-slate-900">
                             {job.company_name}
@@ -691,6 +943,9 @@ export default function Home() {
                             href={job.apply_link}
                             target="_blank"
                             rel="noreferrer"
+                            onClick={(event) => {
+                              onApplyLinkClick(event, job);
+                            }}
                             className="mt-1 inline-block text-xs font-semibold text-cyan-700 hover:text-cyan-900"
                           >
                             Open apply link
@@ -702,6 +957,12 @@ export default function Home() {
                           >
                             {STATUS_LABELS[job.status]}
                           </span>
+                          {job.status === "discarded" && job.discard_reason && (
+                            <p className="mt-1 text-xs font-medium text-orange-700">
+                              Reason:{" "}
+                              {DISCARD_REASON_LABELS[job.discard_reason]}
+                            </p>
+                          )}
                         </td>
                         <td className="px-4 py-4 align-top text-sm text-slate-700">
                           {formatAppliedDate(job.applied_at)}
@@ -711,7 +972,7 @@ export default function Home() {
                         </td>
                         <td className="px-4 py-4 align-top">
                           <div className="flex gap-2">
-                            {job.resume_link ? (
+                            {job.resume_link && (
                               <a
                                 href={job.resume_link}
                                 target="_blank"
@@ -720,10 +981,6 @@ export default function Home() {
                               >
                                 Download Resume
                               </a>
-                            ) : (
-                              <span className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-400">
-                                No Resume
-                              </span>
                             )}
                             <button
                               type="button"
@@ -877,10 +1134,17 @@ export default function Home() {
                   <select
                     value={form.status}
                     onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        status: event.target.value as JobStatus,
-                      }))
+                      setForm((prev) => {
+                        const nextStatus = event.target.value as JobStatus;
+                        return {
+                          ...prev,
+                          status: nextStatus,
+                          discard_reason:
+                            nextStatus === "discarded"
+                              ? prev.discard_reason
+                              : "",
+                        };
+                      })
                     }
                     className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring"
                   >
@@ -896,6 +1160,34 @@ export default function Home() {
                     </span>
                   )}
                 </label>
+
+                {form.status === "discarded" && (
+                  <label className="text-sm font-medium text-slate-700">
+                    Discard Reason
+                    <select
+                      value={form.discard_reason}
+                      onChange={(event) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          discard_reason: event.target.value as DiscardReason,
+                        }))
+                      }
+                      className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring"
+                    >
+                      <option value="">Select reason</option>
+                      {DISCARD_REASONS.map((reason) => (
+                        <option key={reason} value={reason}>
+                          {DISCARD_REASON_LABELS[reason]}
+                        </option>
+                      ))}
+                    </select>
+                    {formErrors.discard_reason && (
+                      <span className="mt-1 block text-xs text-rose-700">
+                        {formErrors.discard_reason}
+                      </span>
+                    )}
+                  </label>
+                )}
 
                 <label className="text-sm font-medium text-slate-700 sm:col-span-2">
                   Apply Link
@@ -1029,6 +1321,80 @@ export default function Home() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {applyConfirmJob && (
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-900/55 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Confirm Application
+            </p>
+            <h3 className="mt-1 text-lg font-semibold text-slate-900">
+              Did you apply to {applyConfirmJob.company_name}?
+            </h3>
+            <p className="mt-2 text-sm text-slate-600">
+              Choose Yes to set status as Applied and applied date/time as now.
+            </p>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setApplyConfirmJob(null)}
+                disabled={markingAppliedId === applyConfirmJob.id}
+                className="h-10 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                No
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void onConfirmApplied();
+                }}
+                disabled={markingAppliedId === applyConfirmJob.id}
+                className="h-10 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {markingAppliedId === applyConfirmJob.id
+                  ? "Updating..."
+                  : "Yes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBulkDeleteConfirm && (
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-900/55 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Confirm Bulk Delete
+            </p>
+            <h3 className="mt-1 text-lg font-semibold text-slate-900">
+              Delete {selectedJobIds.length} selected job applications?
+            </h3>
+            <p className="mt-2 text-sm text-slate-600">
+              This will remove all selected jobs from your tracker.
+            </p>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowBulkDeleteConfirm(false)}
+                disabled={bulkDeleting}
+                className="h-10 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void onConfirmBulkDelete();
+                }}
+                disabled={bulkDeleting}
+                className="h-10 rounded-lg bg-rose-600 px-4 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {bulkDeleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
           </div>
         </div>
       )}

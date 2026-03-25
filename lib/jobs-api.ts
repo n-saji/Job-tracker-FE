@@ -1,6 +1,7 @@
 import type {
   BackendErrorPayload,
   CreateJobPayload,
+  BulkDeleteJobsResponse,
   ExistsApplyLinkResponse,
   Job,
   ListJobsParams,
@@ -35,6 +36,12 @@ function buildQuery(params: ListJobsParams): string {
   }
   if (params.status) {
     query.set("status", params.status);
+  }
+  if (params.discard_reason) {
+    query.set("discard_reason", params.discard_reason);
+  }
+  if (params.include_discarded) {
+    query.set("include_discarded", "true");
   }
   if (params.company?.trim()) {
     query.set("company", params.company.trim());
@@ -177,6 +184,17 @@ export async function deleteJob(id: string): Promise<void> {
   await requestJson<void>(`/jobs/${id}`, {
     method: "DELETE",
   });
+}
+
+export async function bulkDeleteJobs(ids: string[]): Promise<number> {
+  const payload = await requestJson<BulkDeleteJobsResponse>(
+    "/jobs/bulk-delete",
+    {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    },
+  );
+  return payload.deleted_count;
 }
 
 export async function existsApplyLink(applyLink: string): Promise<boolean> {
