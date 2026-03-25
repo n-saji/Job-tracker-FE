@@ -6,6 +6,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -32,6 +33,7 @@ import {
   type JobFormInput,
   type JobStatus,
 } from "@/lib/job-types";
+import { Download, Edit, Moon, Sun, Trash2 } from "lucide-react";
 
 type FormErrors = Partial<Record<keyof JobFormInput | "form", string>>;
 
@@ -124,27 +126,28 @@ function getApiMessage(error: unknown): string {
 
 function getStatusBadgeClass(status: JobStatus): string {
   if (status === "offer") {
-    return "bg-emerald-100 text-emerald-700 border border-emerald-200";
+    return "bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-700";
   }
   if (status === "interview") {
-    return "bg-sky-100 text-sky-700 border border-sky-200";
+    return "bg-sky-100 text-sky-700 border border-sky-200 dark:bg-sky-900/40 dark:text-sky-300 dark:border-sky-700";
   }
   if (status === "applied") {
-    return "bg-amber-100 text-amber-800 border border-amber-200";
+    return "bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-700";
   }
   if (status === "rejected") {
-    return "bg-rose-100 text-rose-700 border border-rose-200";
+    return "bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:border-rose-700";
   }
   if (status === "added") {
-    return "bg-green-100 text-green-800 border border-green-200";
+    return "bg-green-100 text-green-800 border border-green-200 dark:bg-green-900/40 dark:text-green-300 dark:border-green-700";
   }
   if (status === "discarded") {
-    return "bg-orange-100 text-orange-800 border border-orange-200";
+    return "bg-orange-100 text-orange-800 border border-orange-200 dark:bg-orange-900/40 dark:text-orange-300 dark:border-orange-700";
   }
-  return "bg-slate-100 text-slate-700 border border-slate-200";
+  return "bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600";
 }
 
 export default function Home() {
+  const [theme, setTheme] = useState<"light" | "dark">("light");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
@@ -178,6 +181,12 @@ export default function Home() {
   const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const selectAllRef = useRef<HTMLInputElement | null>(null);
+
+  const allVisibleSelected =
+    jobs.length > 0 && jobs.every((job) => selectedJobIds.includes(job.id));
+  const someVisibleSelected =
+    !allVisibleSelected && jobs.some((job) => selectedJobIds.includes(job.id));
 
   const totalPages = useMemo(() => {
     if (!total) {
@@ -273,9 +282,36 @@ export default function Home() {
     );
   }, [jobs]);
 
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someVisibleSelected;
+    }
+  }, [someVisibleSelected]);
+
   const refreshAll = useCallback(async () => {
     await Promise.all([loadJobs(), loadAnalytics()]);
   }, [loadAnalytics, loadJobs]);
+
+  useEffect(() => {
+    const storedTheme = window.localStorage.getItem("job-tracker-theme");
+    if (storedTheme === "light" || storedTheme === "dark") {
+      setTheme(storedTheme);
+      return;
+    }
+
+    if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      setTheme("dark");
+    }
+  }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const isDark = theme === "dark";
+
+    root.classList.toggle("dark", isDark);
+    root.style.colorScheme = isDark ? "dark" : "light";
+    window.localStorage.setItem("job-tracker-theme", theme);
+  }, [theme]);
 
   function closeForm() {
     setIsFormOpen(false);
@@ -537,6 +573,15 @@ export default function Home() {
     });
   }
 
+  function toggleAllVisibleJobSelections() {
+    if (allVisibleSelected) {
+      setSelectedJobIds([]);
+      return;
+    }
+
+    setSelectedJobIds(jobs.map((job) => job.id));
+  }
+
   async function onConfirmBulkDelete() {
     if (selectedJobIds.length < 2) {
       return;
@@ -617,40 +662,59 @@ export default function Home() {
   function getSummaryCardClass(cardStatus: JobStatus | ""): string {
     const isActive = statusFilter === cardStatus;
     if (isActive) {
-      return "rounded-2xl border border-cyan-300 bg-cyan-50 p-5 text-left shadow-sm";
+      return "rounded-2xl border border-cyan-300 bg-cyan-50 p-5 text-left shadow-sm dark:border-cyan-700/80 dark:bg-cyan-900/30";
     }
-    return "rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-cyan-200 hover:bg-cyan-50/40";
+    return "rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-cyan-200 hover:bg-cyan-50/40 dark:border-slate-700 dark:bg-slate-900/80 dark:hover:border-cyan-700 dark:hover:bg-cyan-900/20";
+  }
+
+  function toggleTheme() {
+    setTheme((prevTheme) => (prevTheme === "light" ? "dark" : "light"));
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(120deg,#f8fafc_0%,#f1f5f9_38%,#e2e8f0_100%)] pb-12">
+    <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(120deg,#f8fafc_0%,#f1f5f9_38%,#e2e8f0_100%)] pb-12 transition-colors dark:bg-[linear-gradient(120deg,#020617_0%,#0f172a_45%,#1e293b_100%)]">
       <div className="pointer-events-none absolute -top-20 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-cyan-300/30 blur-3xl" />
       <div className="pointer-events-none absolute -right-16 top-1/3 h-72 w-72 rounded-full bg-amber-300/35 blur-3xl" />
 
       <main className="relative mx-auto w-full max-w-7xl px-4 pt-10 sm:px-6 lg:px-8">
-        <header className="mb-8 rounded-3xl border border-slate-200/70 bg-white/75 p-6 shadow-xl backdrop-blur">
+        <header className="mb-8 rounded-3xl border border-slate-200/70 bg-white/75 p-6 shadow-xl backdrop-blur dark:border-slate-700/70 dark:bg-slate-900/70">
           <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-300">
                 Job Tracker Dashboard
               </p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl dark:text-slate-100">
                 Track every role, interview, and offer.
               </h1>
-              <p className="mt-2 text-sm text-slate-600">
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
                 Connected API base URL:{" "}
-                <span className="font-semibold text-slate-900">
+                <span className="font-semibold text-slate-900 dark:text-slate-100">
                   {API_BASE_URL}
                 </span>
               </p>
             </div>
-            <button
-              type="button"
-              onClick={openCreate}
-              className="h-11 rounded-xl bg-slate-900 px-5 text-sm font-semibold text-white transition hover:bg-slate-700"
-            >
-              New Application
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={openCreate}
+                className="h-11 rounded-xl bg-slate-900 px-5 text-sm font-semibold text-white transition hover:bg-slate-700 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400"
+              >
+                New Application
+              </button>
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 transition hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+                aria-label="Toggle color theme"
+                title={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+              >
+                {theme === "light" ? (
+                  <Moon className="h-4 w-4" />
+                ) : (
+                  <Sun className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </div>
         </header>
 
@@ -658,24 +722,24 @@ export default function Home() {
           <div
             className={`mb-6 rounded-xl border px-4 py-3 text-sm ${
               notice.kind === "success"
-                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                : "border-rose-200 bg-rose-50 text-rose-700"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
+                : "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-900/30 dark:text-rose-300"
             }`}
           >
             {notice.message}
           </div>
         )}
 
-        <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3 xl:grid-cols-5">
           <button
             type="button"
             onClick={() => applyStatusFilter("", "card")}
             className={getSummaryCardClass("")}
           >
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
               Total Jobs
             </p>
-            <p className="mt-3 text-3xl font-semibold text-slate-900">
+            <p className="mt-3 text-3xl font-semibold text-slate-900 dark:text-slate-100">
               {loadingAnalytics ? "..." : analytics.total}
             </p>
           </button>
@@ -686,10 +750,10 @@ export default function Home() {
               onClick={() => applyStatusFilter(status, "card")}
               className={getSummaryCardClass(status)}
             >
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
                 {STATUS_LABELS[status]}
               </p>
-              <p className="mt-3 text-3xl font-semibold text-slate-900">
+              <p className="mt-3 text-3xl font-semibold text-slate-900 dark:text-slate-100">
                 {loadingAnalytics ? "..." : analytics.byStatus[status]}
               </p>
             </button>
@@ -701,26 +765,26 @@ export default function Home() {
               onClick={() => applyStatusFilter(status, "card")}
               className={getSummaryCardClass(status)}
             >
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
                 {STATUS_LABELS[status]}
               </p>
-              <p className="mt-3 text-3xl font-semibold text-slate-900">
+              <p className="mt-3 text-3xl font-semibold text-slate-900 dark:text-slate-100">
                 {loadingAnalytics ? "..." : analytics.byStatus[status]}
               </p>
             </button>
           ))}
         </section>
 
-        <section className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-xl backdrop-blur sm:p-6">
-          <div className="mb-5 flex flex-wrap items-end gap-3 justify-around">
-            <label className="flex min-w-[160px] flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <section className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-xl backdrop-blur sm:p-6 dark:border-slate-700 dark:bg-slate-900/90">
+          <div className="mb-5 flex flex-wrap items-end gap-3 justify-between">
+            <label className="flex min-w-40 flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
               Status
               <select
                 value={statusFilter}
                 onChange={(event) => {
                   applyStatusFilter(event.target.value as JobStatus | "");
                 }}
-                className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 outline-none ring-cyan-300 transition focus:ring"
+                className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
               >
                 <option value="">All statuses</option>
                 {JOB_STATUSES.filter(
@@ -734,7 +798,7 @@ export default function Home() {
             </label>
 
             {showDiscardedJobs && statusFilter === "discarded" && (
-              <label className="flex min-w-[180px] flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <label className="flex min-w-45 flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
                 Discard Reason
                 <select
                   value={discardReasonFilter}
@@ -744,7 +808,7 @@ export default function Home() {
                       event.target.value as DiscardReason | "",
                     );
                   }}
-                  className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 outline-none ring-cyan-300 transition focus:ring"
+                  className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                 >
                   <option value="">All reasons</option>
                   {DISCARD_REASONS.map((reason) => (
@@ -756,7 +820,7 @@ export default function Home() {
               </label>
             )}
 
-            <label className="flex min-w-[190px] flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="flex min-w-[190px] flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
               Company
               <input
                 value={companyFilter}
@@ -765,11 +829,11 @@ export default function Home() {
                   setCompanyFilter(event.target.value);
                 }}
                 placeholder="Search company"
-                className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none ring-cyan-300 transition focus:ring"
+                className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
               />
             </label>
 
-            <label className="flex min-w-[190px] flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="flex min-w-[190px] flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
               Location
               <input
                 value={locationFilter}
@@ -778,11 +842,11 @@ export default function Home() {
                   setLocationFilter(event.target.value);
                 }}
                 placeholder="Search location"
-                className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none ring-cyan-300 transition focus:ring"
+                className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
               />
             </label>
 
-            <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
               Show Discarded
               <button
                 type="button"
@@ -801,7 +865,9 @@ export default function Home() {
                   }
                 }}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
-                  showDiscardedJobs ? "bg-cyan-600" : "bg-slate-300"
+                  showDiscardedJobs
+                    ? "bg-cyan-600"
+                    : "bg-slate-300 dark:bg-slate-700"
                 }`}
               >
                 <span
@@ -812,7 +878,7 @@ export default function Home() {
               </button>
             </label>
 
-            <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
               Page size
               <select
                 value={limit}
@@ -820,7 +886,7 @@ export default function Home() {
                   setPage(1);
                   setLimit(Number(event.target.value));
                 }}
-                className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 outline-none ring-cyan-300 transition focus:ring"
+                className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
               >
                 {PAGE_LIMIT_OPTIONS.map((value) => (
                   <option key={value} value={value}>
@@ -832,8 +898,8 @@ export default function Home() {
           </div>
 
           {selectedJobIds.length >= 1 && (
-            <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-sm font-medium text-slate-700">
+            <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/60">
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
                 {selectedJobIds.length} jobs selected
               </p>
               <div className="flex items-center gap-2">
@@ -857,12 +923,12 @@ export default function Home() {
                     <path d="M10 11v6" />
                     <path d="M14 11v6" />
                   </svg>
-                  Delete
+                  Delete All
                 </button>
                 <button
                   type="button"
                   onClick={() => setSelectedJobIds([])}
-                  className="h-9 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-slate-500"
+                  className="h-9 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-slate-500 dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-400"
                 >
                   Clear
                 </button>
@@ -871,32 +937,42 @@ export default function Home() {
           )}
 
           {jobsError && (
-            <p className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+            <p className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-900/30 dark:text-rose-300">
               {jobsError}
             </p>
           )}
 
-          <div className="overflow-hidden rounded-2xl border border-slate-200">
+          <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700">
             <div className="overflow-x-auto">
               <table className="min-w-full border-collapse">
-                <thead className="bg-slate-100/70">
+                <thead className="bg-slate-100/70 dark:bg-slate-800/80">
                   <tr>
-                    <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-[0.15em] text-slate-500">
-                      Select
+                    <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-300">
+                      <div className="flex justify-center">
+                        <input
+                          ref={selectAllRef}
+                          type="checkbox"
+                          checked={allVisibleSelected}
+                          onChange={toggleAllVisibleJobSelections}
+                          disabled={jobs.length === 0}
+                          className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-500 dark:bg-slate-800"
+                          aria-label="Select all rows"
+                        />
+                      </div>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.15em] text-slate-500">
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-300">
                       Company & Role
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.15em] text-slate-500">
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-300">
                       Status
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.15em] text-slate-500">
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-300">
                       Applied
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.15em] text-slate-500">
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-300">
                       Location
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.15em] text-slate-500">
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-300">
                       Actions
                     </th>
                   </tr>
@@ -905,7 +981,7 @@ export default function Home() {
                   {loadingJobs ? (
                     <tr>
                       <td
-                        className="px-4 py-8 text-center text-sm text-slate-500"
+                        className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-300"
                         colSpan={6}
                       >
                         Loading jobs...
@@ -914,7 +990,7 @@ export default function Home() {
                   ) : jobs.length === 0 ? (
                     <tr>
                       <td
-                        className="px-4 py-8 text-center text-sm text-slate-500"
+                        className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-300"
                         colSpan={6}
                       >
                         No jobs found for the current filters.
@@ -922,21 +998,24 @@ export default function Home() {
                     </tr>
                   ) : (
                     jobs.map((job) => (
-                      <tr key={job.id} className="border-t border-slate-100">
+                      <tr
+                        key={job.id}
+                        className="border-t border-slate-100 dark:border-slate-700/70"
+                      >
                         <td className="h-full w-full px-4 py-4 flex justify-center align-center">
                           <input
                             type="checkbox"
                             checked={selectedJobIds.includes(job.id)}
                             onChange={() => toggleJobSelection(job.id)}
-                            className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-cyan-300"
+                            className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-cyan-300 dark:border-slate-500 dark:bg-slate-800"
                             aria-label={`Select ${job.company_name} ${job.role_title}`}
                           />
                         </td>
                         <td className="px-4 py-4 align-top">
-                          <p className="text-sm font-semibold text-slate-900">
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                             {job.company_name}
                           </p>
-                          <p className="text-xs text-slate-600">
+                          <p className="text-xs text-slate-600 dark:text-slate-300">
                             {job.role_title}
                           </p>
                           <a
@@ -946,7 +1025,7 @@ export default function Home() {
                             onClick={(event) => {
                               onApplyLinkClick(event, job);
                             }}
-                            className="mt-1 inline-block text-xs font-semibold text-cyan-700 hover:text-cyan-900"
+                            className="mt-1 inline-block text-xs font-semibold text-cyan-700 hover:text-cyan-900 dark:text-cyan-300 dark:hover:text-cyan-200"
                           >
                             Open apply link
                           </a>
@@ -958,16 +1037,16 @@ export default function Home() {
                             {STATUS_LABELS[job.status]}
                           </span>
                           {job.status === "discarded" && job.discard_reason && (
-                            <p className="mt-1 text-xs font-medium text-orange-700">
+                            <p className="mt-1 text-xs font-medium text-orange-700 dark:text-orange-300">
                               Reason:{" "}
                               {DISCARD_REASON_LABELS[job.discard_reason]}
                             </p>
                           )}
                         </td>
-                        <td className="px-4 py-4 align-top text-sm text-slate-700">
+                        <td className="px-4 py-4 align-top text-sm text-slate-700 dark:text-slate-200">
                           {formatAppliedDate(job.applied_at)}
                         </td>
-                        <td className="px-4 py-4 align-top text-sm text-slate-700">
+                        <td className="px-4 py-4 align-top text-sm text-slate-700 dark:text-slate-200">
                           {job.location || "-"}
                         </td>
                         <td className="px-4 py-4 align-top">
@@ -979,15 +1058,18 @@ export default function Home() {
                                 rel="noreferrer"
                                 className="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:border-emerald-400"
                               >
-                                Download Resume
+                                <Download
+                                  className="h-4 w-4"
+                                  aria-hidden="true"
+                                />
                               </a>
                             )}
                             <button
                               type="button"
                               onClick={() => void openEdit(job.id)}
-                              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-500"
+                              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-500 dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-400"
                             >
-                              Edit
+                              <Edit className="h-4 w-4" aria-hidden="true" />
                             </button>
                             <button
                               type="button"
@@ -995,7 +1077,12 @@ export default function Home() {
                               disabled={deletingId === job.id}
                               className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:border-rose-400 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                              {deletingId === job.id ? "Deleting..." : "Delete"}
+                              {deletingId === job.id ? null : (
+                                <Trash2
+                                  className="h-4 w-4"
+                                  aria-hidden="true"
+                                />
+                              )}
                             </button>
                           </div>
                         </td>
@@ -1008,10 +1095,15 @@ export default function Home() {
           </div>
 
           <div className="mt-4 flex items-center justify-between">
-            <p className="text-sm text-slate-600">
-              Page <span className="font-semibold text-slate-900">{page}</span>{" "}
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Page{" "}
+              <span className="font-semibold text-slate-900 dark:text-slate-100">
+                {page}
+              </span>{" "}
               of{" "}
-              <span className="font-semibold text-slate-900">{totalPages}</span>{" "}
+              <span className="font-semibold text-slate-900 dark:text-slate-100">
+                {totalPages}
+              </span>{" "}
               ({total} jobs)
             </p>
             <div className="flex gap-2">
@@ -1019,7 +1111,7 @@ export default function Home() {
                 type="button"
                 onClick={() => setPage((current) => Math.max(1, current - 1))}
                 disabled={page <= 1 || loadingJobs}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-400"
               >
                 Previous
               </button>
@@ -1029,7 +1121,7 @@ export default function Home() {
                   setPage((current) => Math.min(totalPages, current + 1))
                 }
                 disabled={page >= totalPages || loadingJobs}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-400"
               >
                 Next
               </button>
@@ -1040,13 +1132,13 @@ export default function Home() {
 
       {isFormOpen && (
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-slate-900/50 p-4">
-          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-300">
                   {isCreateMode ? "Create" : "Edit"}
                 </p>
-                <h2 className="text-xl font-semibold text-slate-900">
+                <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
                   {isCreateMode
                     ? "New Job Application"
                     : "Update Job Application"}
@@ -1055,7 +1147,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={closeForm}
-                className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700"
+                className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200"
               >
                 Close
               </button>
@@ -1072,7 +1164,7 @@ export default function Home() {
               )}
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className="text-sm font-medium text-slate-700">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
                   Company Name
                   <input
                     value={form.company_name}
@@ -1082,7 +1174,7 @@ export default function Home() {
                         company_name: event.target.value,
                       }))
                     }
-                    className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring"
+                    className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                   />
                   {formErrors.company_name && (
                     <span className="mt-1 block text-xs text-rose-700">
@@ -1091,7 +1183,7 @@ export default function Home() {
                   )}
                 </label>
 
-                <label className="text-sm font-medium text-slate-700">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
                   Role Title
                   <input
                     value={form.role_title}
@@ -1101,7 +1193,7 @@ export default function Home() {
                         role_title: event.target.value,
                       }))
                     }
-                    className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring"
+                    className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                   />
                   {formErrors.role_title && (
                     <span className="mt-1 block text-xs text-rose-700">
@@ -1110,7 +1202,7 @@ export default function Home() {
                   )}
                 </label>
 
-                <label className="text-sm font-medium text-slate-700">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
                   Location
                   <input
                     value={form.location}
@@ -1120,7 +1212,7 @@ export default function Home() {
                         location: event.target.value,
                       }))
                     }
-                    className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring"
+                    className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                   />
                   {formErrors.location && (
                     <span className="mt-1 block text-xs text-rose-700">
@@ -1129,7 +1221,7 @@ export default function Home() {
                   )}
                 </label>
 
-                <label className="text-sm font-medium text-slate-700">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
                   Status
                   <select
                     value={form.status}
@@ -1146,7 +1238,7 @@ export default function Home() {
                         };
                       })
                     }
-                    className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring"
+                    className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                   >
                     {JOB_STATUSES.map((status) => (
                       <option key={status} value={status}>
@@ -1162,7 +1254,7 @@ export default function Home() {
                 </label>
 
                 {form.status === "discarded" && (
-                  <label className="text-sm font-medium text-slate-700">
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
                     Discard Reason
                     <select
                       value={form.discard_reason}
@@ -1172,7 +1264,7 @@ export default function Home() {
                           discard_reason: event.target.value as DiscardReason,
                         }))
                       }
-                      className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring"
+                      className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                     >
                       <option value="">Select reason</option>
                       {DISCARD_REASONS.map((reason) => (
@@ -1189,7 +1281,7 @@ export default function Home() {
                   </label>
                 )}
 
-                <label className="text-sm font-medium text-slate-700 sm:col-span-2">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-200 sm:col-span-2">
                   Apply Link
                   <input
                     value={form.apply_link}
@@ -1214,19 +1306,21 @@ export default function Home() {
                       })();
                     }}
                     placeholder="https://..."
-                    className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring"
+                    className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                   />
                   <div className="mt-1 flex items-center justify-between text-xs">
                     <span className="text-rose-700">
                       {formErrors.apply_link}
                     </span>
                     {checkingApplyLink && (
-                      <span className="text-slate-500">Checking link...</span>
+                      <span className="text-slate-500 dark:text-slate-300">
+                        Checking link...
+                      </span>
                     )}
                   </div>
                 </label>
 
-                <label className="text-sm font-medium text-slate-700">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
                   LinkedIn Job URL
                   <input
                     value={form.linkedin_job_url}
@@ -1237,11 +1331,11 @@ export default function Home() {
                       }))
                     }
                     placeholder="Optional"
-                    className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring"
+                    className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                   />
                 </label>
 
-                <label className="text-sm font-medium text-slate-700">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
                   Resume Link
                   <input
                     value={form.resume_link}
@@ -1252,11 +1346,11 @@ export default function Home() {
                       }))
                     }
                     placeholder="Optional"
-                    className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring"
+                    className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                   />
                 </label>
 
-                <label className="text-sm font-medium text-slate-700">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
                   Salary Text
                   <input
                     value={form.salary_text}
@@ -1267,11 +1361,11 @@ export default function Home() {
                       }))
                     }
                     placeholder="Optional"
-                    className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring"
+                    className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                   />
                 </label>
 
-                <label className="text-sm font-medium text-slate-700">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
                   Applied At
                   <input
                     type="datetime-local"
@@ -1282,7 +1376,7 @@ export default function Home() {
                         applied_at: event.target.value,
                       }))
                     }
-                    className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring"
+                    className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                   />
                   {formErrors.applied_at && (
                     <span className="mt-1 block text-xs text-rose-700">
@@ -1292,7 +1386,7 @@ export default function Home() {
                 </label>
               </div>
 
-              <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                 <input
                   type="checkbox"
                   checked={form.is_easy_apply}
@@ -1302,7 +1396,7 @@ export default function Home() {
                       is_easy_apply: event.target.checked,
                     }))
                   }
-                  className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-cyan-300"
+                  className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-cyan-300 dark:border-slate-500 dark:bg-slate-800"
                 />
                 Easy Apply
               </label>
@@ -1327,14 +1421,14 @@ export default function Home() {
 
       {applyConfirmJob && (
         <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-900/55 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-300">
               Confirm Application
             </p>
-            <h3 className="mt-1 text-lg font-semibold text-slate-900">
+            <h3 className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
               Did you apply to {applyConfirmJob.company_name}?
             </h3>
-            <p className="mt-2 text-sm text-slate-600">
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
               Choose Yes to set status as Applied and applied date/time as now.
             </p>
             <div className="mt-5 flex items-center justify-end gap-2">
@@ -1342,7 +1436,7 @@ export default function Home() {
                 type="button"
                 onClick={() => setApplyConfirmJob(null)}
                 disabled={markingAppliedId === applyConfirmJob.id}
-                className="h-10 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60"
+                className="h-10 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-400"
               >
                 No
               </button>
@@ -1365,14 +1459,14 @@ export default function Home() {
 
       {showBulkDeleteConfirm && (
         <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-900/55 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-300">
               Confirm Bulk Delete
             </p>
-            <h3 className="mt-1 text-lg font-semibold text-slate-900">
+            <h3 className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
               Delete {selectedJobIds.length} selected job applications?
             </h3>
-            <p className="mt-2 text-sm text-slate-600">
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
               This will remove all selected jobs from your tracker.
             </p>
             <div className="mt-5 flex items-center justify-end gap-2">
@@ -1380,7 +1474,7 @@ export default function Home() {
                 type="button"
                 onClick={() => setShowBulkDeleteConfirm(false)}
                 disabled={bulkDeleting}
-                className="h-10 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60"
+                className="h-10 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-400"
               >
                 Cancel
               </button>
