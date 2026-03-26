@@ -2,8 +2,11 @@ import type {
   BackendErrorPayload,
   CreateJobPayload,
   BulkDeleteJobsResponse,
+  BulkUpdateJobsStatusResponse,
   ExistsApplyLinkResponse,
   Job,
+  JobStatus,
+  DiscardReason,
   ListJobsParams,
   ListJobsResponse,
   UpdateJobPayload,
@@ -195,6 +198,25 @@ export async function bulkDeleteJobs(ids: string[]): Promise<number> {
     },
   );
   return payload.deleted_count;
+}
+
+export async function bulkUpdateJobsStatus(
+  ids: string[],
+  status: JobStatus,
+  discardReason?: DiscardReason,
+): Promise<number> {
+  const payload = await requestJson<BulkUpdateJobsStatusResponse>(
+    "/jobs/bulk-update-status",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ids,
+        status,
+        discard_reason: discardReason ?? "",
+      }),
+    },
+  );
+  return payload.updated_count;
 }
 
 export async function existsApplyLink(applyLink: string): Promise<boolean> {

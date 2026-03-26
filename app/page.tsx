@@ -14,6 +14,7 @@ import {
   ApiError,
   API_BASE_URL,
   bulkDeleteJobs,
+  bulkUpdateJobsStatus,
   createJob,
   deleteJob,
   existsApplyLink,
@@ -181,6 +182,11 @@ export default function Home() {
   const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkTargetStatus, setBulkTargetStatus] = useState<JobStatus | "">("");
+  const [bulkDiscardReason, setBulkDiscardReason] = useState<
+    DiscardReason | ""
+  >("");
+  const [bulkUpdatingStatus, setBulkUpdatingStatus] = useState(false);
   const selectAllRef = useRef<HTMLInputElement | null>(null);
 
   const allVisibleSelected =
@@ -281,6 +287,13 @@ export default function Home() {
       prev.filter((id) => jobs.some((job) => job.id === id)),
     );
   }, [jobs]);
+
+  useEffect(() => {
+    if (selectedJobIds.length === 0) {
+      setBulkTargetStatus("");
+      setBulkDiscardReason("");
+    }
+  }, [selectedJobIds.length]);
 
   useEffect(() => {
     if (selectAllRef.current) {
@@ -605,6 +618,52 @@ export default function Home() {
     }
   }
 
+  async function onBulkStatusUpdate() {
+    if (selectedJobIds.length === 0) {
+      return;
+    }
+
+    if (!bulkTargetStatus) {
+      setNotice({ kind: "error", message: "Select a target status first." });
+      return;
+    }
+
+    if (bulkTargetStatus === "discarded" && !bulkDiscardReason) {
+      setNotice({
+        kind: "error",
+        message: "Select a discard reason when updating to discarded.",
+      });
+      return;
+    }
+
+    setNotice(null);
+    setBulkUpdatingStatus(true);
+    try {
+      const bulkDiscardReasonValue =
+        bulkTargetStatus === "discarded" && bulkDiscardReason
+          ? bulkDiscardReason
+          : undefined;
+
+      const updatedCount = await bulkUpdateJobsStatus(
+        selectedJobIds,
+        bulkTargetStatus,
+        bulkDiscardReasonValue,
+      );
+      setNotice({
+        kind: "success",
+        message: `${updatedCount} job application(s) updated to ${STATUS_LABELS[bulkTargetStatus]}.`,
+      });
+      setSelectedJobIds([]);
+      setBulkTargetStatus("");
+      setBulkDiscardReason("");
+      await refreshAll();
+    } catch (error) {
+      setNotice({ kind: "error", message: getApiMessage(error) });
+    } finally {
+      setBulkUpdatingStatus(false);
+    }
+  }
+
   function onApplyLinkClick(event: MouseEvent<HTMLAnchorElement>, job: Job) {
     event.preventDefault();
     window.open(job.apply_link, "_blank", "noopener,noreferrer");
@@ -820,7 +879,7 @@ export default function Home() {
               </label>
             )}
 
-            <label className="flex min-w-[190px] flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+            <label className="flex min-w-47.5 flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
               Company
               <input
                 value={companyFilter}
@@ -833,7 +892,7 @@ export default function Home() {
               />
             </label>
 
-            <label className="flex min-w-[190px] flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+            <label className="flex min-w-47.5 flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
               Location
               <input
                 value={locationFilter}
@@ -903,6 +962,54 @@ export default function Home() {
                 {selectedJobIds.length} jobs selected
               </p>
               <div className="flex items-center gap-2">
+                <select
+                  value={bulkTargetStatus}
+                  onChange={(event) => {
+                    const nextStatus = event.target.value as JobStatus | "";
+                    setBulkTargetStatus(nextStatus);
+                    if (nextStatus !== "discarded") {
+                      setBulkDiscardReason("");
+                    }
+                  }}
+                  className="h-9 rounded-lg border border-slate-300 bg-white px-2 text-sm font-medium text-slate-700 outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                >
+                  <option value="">Set status...</option>
+                  {JOB_STATUSES.map((status) => (
+                    <option key={status} value={status}>
+                      {STATUS_LABELS[status]}
+                    </option>
+                  ))}
+                </select>
+                {bulkTargetStatus === "discarded" && (
+                  <select
+                    value={bulkDiscardReason}
+                    onChange={(event) => {
+                      setBulkDiscardReason(event.target.value as DiscardReason);
+                    }}
+                    className="h-9 rounded-lg border border-slate-300 bg-white px-2 text-sm font-medium text-slate-700 outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                  >
+                    <option value="">Discard reason...</option>
+                    {DISCARD_REASONS.map((reason) => (
+                      <option key={reason} value={reason}>
+                        {DISCARD_REASON_LABELS[reason]}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    void onBulkStatusUpdate();
+                  }}
+                  disabled={
+                    bulkUpdatingStatus ||
+                    !bulkTargetStatus ||
+                    (bulkTargetStatus === "discarded" && !bulkDiscardReason)
+                  }
+                  className="h-9 rounded-lg border border-cyan-300 px-3 text-sm font-semibold text-cyan-700 transition hover:border-cyan-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-cyan-700 dark:text-cyan-300 dark:hover:border-cyan-500"
+                >
+                  {bulkUpdatingStatus ? "Updating..." : "Update Status"}
+                </button>
                 <button
                   type="button"
                   onClick={() => setShowBulkDeleteConfirm(true)}
@@ -927,7 +1034,11 @@ export default function Home() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSelectedJobIds([])}
+                  onClick={() => {
+                    setSelectedJobIds([]);
+                    setBulkTargetStatus("");
+                    setBulkDiscardReason("");
+                  }}
                   className="h-9 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-slate-500 dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-400"
                 >
                   Clear
@@ -1018,17 +1129,24 @@ export default function Home() {
                           <p className="text-xs text-slate-600 dark:text-slate-300">
                             {job.role_title}
                           </p>
-                          <a
-                            href={job.apply_link}
-                            target="_blank"
-                            rel="noreferrer"
-                            onClick={(event) => {
-                              onApplyLinkClick(event, job);
-                            }}
-                            className="mt-1 inline-block text-xs font-semibold text-cyan-700 hover:text-cyan-900 dark:text-cyan-300 dark:hover:text-cyan-200"
-                          >
-                            Open apply link
-                          </a>
+                          <div className="mt-1 flex items-center gap-2">
+                            <a
+                              href={job.apply_link}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(event) => {
+                                onApplyLinkClick(event, job);
+                              }}
+                              className="inline-block text-xs font-semibold text-cyan-700 hover:text-cyan-900 dark:text-cyan-300 dark:hover:text-cyan-200"
+                            >
+                              Open apply link
+                            </a>
+                            {job.is_easy_apply && (
+                              <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                                Easy Apply
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-4 align-top">
                           <span

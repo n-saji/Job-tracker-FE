@@ -53,6 +53,10 @@ export interface BulkDeleteJobsResponse {
   deleted_count: number;
 }
 
+export interface BulkUpdateJobsStatusResponse {
+  updated_count: number;
+}
+
 export interface ListJobsParams {
   page?: number;
   limit?: number;
