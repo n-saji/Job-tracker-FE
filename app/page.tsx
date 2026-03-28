@@ -22,8 +22,10 @@ import {
   getJob,
   listJobs,
   normalizeApplyLink,
+  subscribeToJobCreated,
   toDateTimeLocalValue,
   toIsoFromDateTimeLocal,
+  triggerResumeGenerate,
   updateJob,
 } from "@/lib/jobs-api";
 import {
@@ -73,6 +75,7 @@ function buildEmptyForm(): JobFormInput {
     company_name: "",
     role_title: "",
     location: "",
+    job_description: "",
     apply_link: "",
     linkedin_job_url: "",
     resume_link: "",
@@ -89,6 +92,7 @@ function formFromJob(job: Job): JobFormInput {
     company_name: job.company_name,
     role_title: job.role_title,
     location: job.location,
+    job_description: job.job_description,
     apply_link: job.apply_link,
     linkedin_job_url: job.linkedin_job_url,
     resume_link: job.resume_link,
@@ -187,6 +191,10 @@ export default function Home() {
     DiscardReason | ""
   >("");
   const [bulkUpdatingStatus, setBulkUpdatingStatus] = useState(false);
+  const [generatingResumeById, setGeneratingResumeById] = useState<
+    Record<string, boolean>
+  >({});
+  const refreshAllRef = useRef<(() => Promise<void>) | null>(null);
   const selectAllRef = useRef<HTMLInputElement | null>(null);
 
   const allVisibleSelected =
@@ -304,6 +312,20 @@ export default function Home() {
   const refreshAll = useCallback(async () => {
     await Promise.all([loadJobs(), loadAnalytics()]);
   }, [loadAnalytics, loadJobs]);
+
+  useEffect(() => {
+    refreshAllRef.current = refreshAll;
+  }, [refreshAll]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToJobCreated(() => {
+      if (refreshAllRef.current) {
+        void refreshAllRef.current();
+      }
+    });
+
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     const storedTheme = window.localStorage.getItem("job-tracker-theme");
@@ -436,6 +458,7 @@ export default function Home() {
       company_name: value.company_name.trim(),
       role_title: value.role_title.trim(),
       location: value.location.trim(),
+      job_description: value.job_description.trim(),
       apply_link: normalizeApplyLink(value.apply_link),
       linkedin_job_url: value.linkedin_job_url.trim(),
       resume_link: value.resume_link.trim(),
@@ -455,6 +478,7 @@ export default function Home() {
       company_name: value.company_name.trim(),
       role_title: value.role_title.trim(),
       location: value.location.trim(),
+      job_description: value.job_description.trim(),
       apply_link: normalizeApplyLink(value.apply_link),
       linkedin_job_url: value.linkedin_job_url.trim(),
       resume_link: value.resume_link.trim(),
@@ -473,6 +497,9 @@ export default function Home() {
     }
     if (withTrim.location !== current.location) {
       payload.location = withTrim.location;
+    }
+    if (withTrim.job_description !== current.job_description) {
+      payload.job_description = withTrim.job_description;
     }
     if (withTrim.apply_link !== normalizeApplyLink(current.apply_link)) {
       payload.apply_link = withTrim.apply_link;
@@ -500,6 +527,76 @@ export default function Home() {
     }
 
     return payload;
+  }
+
+  function setResumeGenerating(jobID: string, value: boolean) {
+    setGeneratingResumeById((prev) => {
+      if (value) {
+        return { ...prev, [jobID]: true };
+      }
+      const next = { ...prev };
+      delete next[jobID];
+      return next;
+    });
+  }
+
+  function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      window.setTimeout(resolve, ms);
+    });
+  }
+
+  async function waitForResumeLink(jobID: string): Promise<Job | null> {
+    const maxAttempts = 25;
+    const delayMs = 2500;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const latestJob = await getJob(jobID);
+      if (latestJob.resume_link.trim()) {
+        return latestJob;
+      }
+
+      await sleep(delayMs);
+    }
+
+    return null;
+  }
+
+  async function onGenerateResume(job: Job) {
+    if (generatingResumeById[job.id]) {
+      return;
+    }
+
+    setNotice(null);
+    setResumeGenerating(job.id, true);
+    try {
+      const response = await triggerResumeGenerate(job.id);
+      setNotice({
+        kind: "success",
+        message: response.message || "Resume generation queued.",
+      });
+
+      const updatedJob = await waitForResumeLink(job.id);
+      if (!updatedJob) {
+        setNotice({
+          kind: "success",
+          message:
+            "Resume generation is in progress. The link will appear once ready.",
+        });
+        return;
+      }
+
+      setJobs((prev) =>
+        prev.map((existing) =>
+          existing.id === updatedJob.id ? updatedJob : existing,
+        ),
+      );
+      setNotice({ kind: "success", message: "Resume link updated." });
+    } catch (error) {
+      setNotice({ kind: "error", message: getApiMessage(error) });
+    } finally {
+      setResumeGenerating(job.id, false);
+    }
   }
 
   async function onSubmitForm(event: FormEvent<HTMLFormElement>) {
@@ -1129,6 +1226,11 @@ export default function Home() {
                           <p className="text-xs text-slate-600 dark:text-slate-300">
                             {job.role_title}
                           </p>
+                          {job.job_description.trim() && (
+                            <p className="mt-1 line-clamp-2 text-xs text-slate-500 dark:text-slate-400">
+                              {job.job_description}
+                            </p>
+                          )}
                           <div className="mt-1 flex items-center gap-2">
                             <a
                               href={job.apply_link}
@@ -1181,6 +1283,20 @@ export default function Home() {
                                   aria-hidden="true"
                                 />
                               </a>
+                            )}
+                            {!job.resume_link && job.job_description.trim() && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  void onGenerateResume(job);
+                                }}
+                                disabled={Boolean(generatingResumeById[job.id])}
+                                className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:border-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {generatingResumeById[job.id]
+                                  ? "Generating..."
+                                  : "Generate Resume"}
+                              </button>
                             )}
                             <button
                               type="button"
@@ -1337,6 +1453,22 @@ export default function Home() {
                       {formErrors.location}
                     </span>
                   )}
+                </label>
+
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-200 sm:col-span-2">
+                  Job Description
+                  <textarea
+                    value={form.job_description}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        job_description: event.target.value,
+                      }))
+                    }
+                    rows={4}
+                    placeholder="Optional"
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                  />
                 </label>
 
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-200">

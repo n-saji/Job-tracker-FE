@@ -5,10 +5,13 @@ import type {
   BulkUpdateJobsStatusResponse,
   ExistsApplyLinkResponse,
   Job,
+  JobCreatedSSEPayload,
   JobStatus,
   DiscardReason,
   ListJobsParams,
   ListJobsResponse,
+  ResumeGenerateTriggerResponse,
+  ResumeQueueListResponse,
   UpdateJobPayload,
 } from "@/lib/job-types";
 
@@ -226,6 +229,80 @@ export async function existsApplyLink(applyLink: string): Promise<boolean> {
     `/jobs/exists?${query.toString()}`,
   );
   return payload.exists;
+}
+
+export async function triggerResumeGenerate(
+  id: string,
+): Promise<ResumeGenerateTriggerResponse> {
+  return requestJson<ResumeGenerateTriggerResponse>(
+    `/jobs/${id}/resume-generate`,
+    {
+      method: "POST",
+    },
+  );
+}
+
+export async function listResumeQueue(
+  status = "added",
+  limit = 100,
+): Promise<ResumeQueueListResponse> {
+  const query = new URLSearchParams({
+    status,
+    limit: String(limit),
+  });
+  return requestJson<ResumeQueueListResponse>(
+    `/resume-queue?${query.toString()}`,
+  );
+}
+
+export async function updateResumeLink(
+  id: string,
+  resumeLink: string,
+): Promise<Job> {
+  return requestJson<Job>(`/jobs/${id}/resume-link`, {
+    method: "PATCH",
+    body: JSON.stringify({ resume_link: resumeLink }),
+  });
+}
+
+export async function removeResumeQueueJob(jobID: string): Promise<void> {
+  await requestJson<void>(`/resume-queue/${jobID}`, {
+    method: "DELETE",
+  });
+}
+
+export function subscribeToJobCreated(
+  onCreated: (payload: JobCreatedSSEPayload) => void,
+  onConnectionError?: (event: Event) => void,
+): () => void {
+  const eventsUrl = new URL(`${API_BASE_URL}/jobs/events`);
+  const source = new EventSource(eventsUrl.toString(), {
+    withCredentials: true,
+  });
+
+  const onMessage = (event: MessageEvent<string>) => {
+    try {
+      const payload = JSON.parse(event.data) as JobCreatedSSEPayload;
+      onCreated(payload);
+    } catch {
+      // Ignore malformed payloads and keep stream alive.
+    }
+  };
+
+  const onError = (event: Event) => {
+    if (onConnectionError) {
+      onConnectionError(event);
+    }
+  };
+
+  source.addEventListener("job_created", onMessage as EventListener);
+  source.addEventListener("error", onError);
+
+  return () => {
+    source.removeEventListener("job_created", onMessage as EventListener);
+    source.removeEventListener("error", onError);
+    source.close();
+  };
 }
 
 export { ApiError, API_BASE_URL };

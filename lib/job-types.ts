@@ -25,6 +25,7 @@ export interface Job {
   company_name: string;
   role_title: string;
   location: string;
+  job_description: string;
   apply_link: string;
   linkedin_job_url: string;
   resume_link: string;
@@ -49,6 +50,10 @@ export interface ExistsApplyLinkResponse {
   exists: boolean;
 }
 
+export interface JobCreatedSSEPayload {
+  job: Job;
+}
+
 export interface BulkDeleteJobsResponse {
   deleted_count: number;
 }
@@ -71,6 +76,7 @@ export interface JobFormInput {
   company_name: string;
   role_title: string;
   location: string;
+  job_description: string;
   apply_link: string;
   linkedin_job_url: string;
   resume_link: string;
@@ -90,4 +96,21 @@ export interface BackendErrorPayload {
     code?: string;
     message?: string;
   };
+}
+
+export interface ResumeQueueItem {
+  job_id: string;
+  apply_link: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResumeQueueListResponse {
+  data: ResumeQueueItem[];
+}
+
+export interface ResumeGenerateTriggerResponse {
+  status: string;
+  message: string;
 }
