@@ -1,19 +1,19 @@
 import type {
   BackendErrorPayload,
-  CreateJobPayload,
   BulkDeleteJobsResponse,
   BulkUpdateJobsStatusResponse,
+  CreateJobPayload,
+  DiscardReason,
   ExistsApplyLinkResponse,
   Job,
   JobCreatedSSEPayload,
   JobStatus,
-  DiscardReason,
   ListJobsParams,
   ListJobsResponse,
   ResumeGenerateTriggerResponse,
   ResumeQueueListResponse,
   UpdateJobPayload,
-} from "@/lib/job-types";
+} from "@/lib/types/job";
 
 const DEFAULT_API_BASE_URL = "http://localhost:8000";
 const API_BASE_URL =
@@ -170,9 +170,13 @@ export async function getJob(id: string): Promise<Job> {
 }
 
 export async function createJob(payload: CreateJobPayload): Promise<Job> {
+  const customPayload: Record<string, unknown> = {
+    ...payload,
+    is_easy_apply: String(payload.is_easy_apply),
+  };
   return requestJson<Job>("/jobs", {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify(customPayload),
   });
 }
 
