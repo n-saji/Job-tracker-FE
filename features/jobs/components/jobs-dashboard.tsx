@@ -150,7 +150,7 @@ export function JobsDashboard() {
       <div className="pointer-events-none absolute -top-20 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-cyan-300/30 blur-3xl" />
       <div className="pointer-events-none absolute -right-16 top-1/3 h-72 w-72 rounded-full bg-amber-300/35 blur-3xl" />
 
-      <main className="relative mx-auto w-full max-w-7xl px-4 pt-10 sm:px-6 lg:px-8">
+      <main className="relative mx-auto w-full max-w-8xl px-4 pt-10 sm:px-6 lg:px-8">
         <header className="mb-8 rounded-3xl border border-slate-200/70 bg-white/75 p-6 shadow-xl backdrop-blur dark:border-slate-700/70 dark:bg-slate-900/70">
           <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
             <div>
