@@ -21,11 +21,60 @@ import {
   shouldResetDiscardReason,
 } from "@/features/jobs/utils/dashboard-utils";
 
+function MatchRatingCircle({ rating }: { rating: number }) {
+  const clamped = Math.min(10, Math.max(0, rating));
+  const displayValue = Math.round(clamped);
+  const size = 36;
+  const strokeWidth = 4;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const progress = displayValue / 10;
+  const dashOffset = circumference * (1 - progress);
+
+  return (
+    <div
+      className="relative inline-flex h-9 w-9 items-center justify-center"
+      title={`Match rating: ${displayValue}`}
+      aria-label={`Match rating ${displayValue} out of 10`}
+    >
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        className="-rotate-90"
+        aria-hidden="true"
+      >
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          strokeWidth={strokeWidth}
+          className="stroke-slate-200 dark:stroke-slate-700"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          className="stroke-cyan-500 transition-all duration-500 dark:stroke-cyan-400"
+        />
+      </svg>
+      <span className="absolute text-[13px] font-semibold text-slate-700 dark:text-slate-200">
+        {displayValue}
+      </span>
+    </div>
+  );
+}
+
 export function JobsDashboard() {
   const { theme, toggleTheme } = useTheme();
 
   const {
-    apiBaseUrl,
     jobs,
     page,
     limit,
@@ -36,6 +85,9 @@ export function JobsDashboard() {
     discardReasonFilter,
     companyFilter,
     locationFilter,
+    minMatchRatingFilter,
+    maxMatchRatingFilter,
+    matchSort,
     loadingJobs,
     jobsError,
     analytics,
@@ -66,6 +118,9 @@ export function JobsDashboard() {
     setDiscardReasonFilter,
     setCompanyFilter,
     setLocationFilter,
+    setMinMatchRatingFilter,
+    setMaxMatchRatingFilter,
+    setMatchSort,
     setForm,
     setFormErrors,
     setApplyConfirmJob,
@@ -259,6 +314,56 @@ export function JobsDashboard() {
               />
             </label>
 
+            <label className="flex min-w-36 flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+              Match Min
+              <input
+                type="number"
+                min={0}
+                max={10}
+                step={1}
+                value={minMatchRatingFilter}
+                onChange={(event) => {
+                  setPage(1);
+                  setMinMatchRatingFilter(event.target.value);
+                }}
+                placeholder="0"
+                className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              />
+            </label>
+
+            <label className="flex min-w-36 flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+              Match Max
+              <input
+                type="number"
+                min={0}
+                max={10}
+                step={1}
+                value={maxMatchRatingFilter}
+                onChange={(event) => {
+                  setPage(1);
+                  setMaxMatchRatingFilter(event.target.value);
+                }}
+                placeholder="10"
+                className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              />
+            </label>
+
+            <label className="flex min-w-40 flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+              Match Sort
+              <select
+                value={matchSort}
+                onChange={(event) => {
+                  setPage(1);
+                  setMatchSort(event.target.value as "" | "asc" | "desc");
+                }}
+                className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              >
+                <option value="">Default</option>
+                <option value="desc">Highest match first</option>
+                <option value="asc">Lowest match first</option>
+              </select>
+            </label>
+
             <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
               Show Discarded
               <button
@@ -432,7 +537,10 @@ export function JobsDashboard() {
                       Status
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-300">
-                      Applied
+                      Match
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-300">
+                      Added On
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-300">
                       Location
@@ -447,7 +555,7 @@ export function JobsDashboard() {
                     <tr>
                       <td
                         className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-300"
-                        colSpan={6}
+                        colSpan={7}
                       >
                         Loading jobs...
                       </td>
@@ -456,7 +564,7 @@ export function JobsDashboard() {
                     <tr>
                       <td
                         className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-300"
-                        colSpan={6}
+                        colSpan={7}
                       >
                         No jobs found for the current filters.
                       </td>
@@ -520,8 +628,13 @@ export function JobsDashboard() {
                             </p>
                           )}
                         </td>
+                        <td className="align-top px-4 py-4">
+                          {typeof job.match_rating === "number" ? (
+                            <MatchRatingCircle rating={job.match_rating} />
+                          ) : null}
+                        </td>
                         <td className="align-top px-4 py-4 text-sm text-slate-700 dark:text-slate-200">
-                          {formatAppliedDate(job.applied_at)}
+                          {formatAppliedDate(job.created_at)}
                         </td>
                         <td className="align-top px-4 py-4 text-sm text-slate-700 dark:text-slate-200">
                           {job.location || "-"}
@@ -869,6 +982,30 @@ export function JobsDashboard() {
                     placeholder="Optional"
                     className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                   />
+                </label>
+
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Match Rating (0-10)
+                  <input
+                    type="number"
+                    min={0}
+                    max={10}
+                    step="0.1"
+                    value={form.match_rating}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        match_rating: event.target.value,
+                      }))
+                    }
+                    placeholder="Optional"
+                    className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                  />
+                  {formErrors.match_rating && (
+                    <span className="mt-1 block text-xs text-rose-700">
+                      {formErrors.match_rating}
+                    </span>
+                  )}
                 </label>
 
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-200">

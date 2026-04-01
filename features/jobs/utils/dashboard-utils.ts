@@ -28,6 +28,7 @@ export function buildEmptyForm(): JobFormInput {
     discard_reason: "",
     salary_text: "",
     is_easy_apply: false,
+    match_rating: "",
     applied_at: "",
   };
 }
@@ -45,8 +46,24 @@ export function formFromJob(job: Job): JobFormInput {
     discard_reason: job.discard_reason ?? "",
     salary_text: job.salary_text,
     is_easy_apply: job.is_easy_apply,
+    match_rating:
+      job.match_rating === undefined ? "" : String(job.match_rating),
     applied_at: toDateTimeLocalValue(job.applied_at),
   };
+}
+
+function parseMatchRating(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const parsed = Number(trimmed);
+  if (Number.isNaN(parsed)) {
+    return null;
+  }
+
+  return parsed;
 }
 
 export function analyticsSeed(): Analytics {
@@ -112,10 +129,23 @@ export function validateFormInput(value: JobFormInput): FormErrors {
     nextErrors.applied_at = "Applied date and time is invalid.";
   }
 
+  const trimmedRating = value.match_rating.trim();
+  if (trimmedRating) {
+    const parsedRating = parseMatchRating(value.match_rating);
+    if (parsedRating === null) {
+      nextErrors.match_rating =
+        "Match rating must be a number between 0 and 10.";
+    } else if (parsedRating < 0 || parsedRating > 10) {
+      nextErrors.match_rating = "Match rating must be between 0 and 10.";
+    }
+  }
+
   return nextErrors;
 }
 
 export function buildCreatePayload(value: JobFormInput): CreateJobPayload {
+  const matchRating = parseMatchRating(value.match_rating);
+
   return {
     company_name: value.company_name.trim(),
     role_title: value.role_title.trim(),
@@ -128,6 +158,7 @@ export function buildCreatePayload(value: JobFormInput): CreateJobPayload {
     discard_reason: value.status === "discarded" ? value.discard_reason : "",
     salary_text: value.salary_text.trim(),
     is_easy_apply: value.is_easy_apply,
+    match_rating: matchRating,
     applied_at: toIsoFromDateTimeLocal(value.applied_at),
   };
 }
@@ -137,6 +168,7 @@ export function buildUpdatePayload(
   current: Job,
 ): Record<string, unknown> {
   const nextAppliedAt = toIsoFromDateTimeLocal(value.applied_at);
+  const nextMatchRating = parseMatchRating(value.match_rating);
   const payload: Record<string, unknown> = {};
 
   const withTrim = {
@@ -151,6 +183,7 @@ export function buildUpdatePayload(
     discard_reason: value.status === "discarded" ? value.discard_reason : "",
     salary_text: value.salary_text.trim(),
     is_easy_apply: value.is_easy_apply,
+    match_rating: nextMatchRating,
     applied_at: nextAppliedAt,
   };
 
@@ -186,6 +219,9 @@ export function buildUpdatePayload(
   }
   if (withTrim.is_easy_apply !== current.is_easy_apply) {
     payload.is_easy_apply = withTrim.is_easy_apply;
+  }
+  if ((withTrim.match_rating ?? null) !== (current.match_rating ?? null)) {
+    payload.match_rating = withTrim.match_rating;
   }
   if (withTrim.applied_at !== current.applied_at) {
     payload.applied_at = withTrim.applied_at;

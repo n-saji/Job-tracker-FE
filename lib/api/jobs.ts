@@ -55,6 +55,15 @@ function buildQuery(params: ListJobsParams): string {
   if (params.location?.trim()) {
     query.set("location", params.location.trim());
   }
+  if (typeof params.min_match_rating === "number") {
+    query.set("min_match_rating", String(params.min_match_rating));
+  }
+  if (typeof params.max_match_rating === "number") {
+    query.set("max_match_rating", String(params.max_match_rating));
+  }
+  if (params.sort_match) {
+    query.set("sort_match", params.sort_match);
+  }
 
   return query.toString();
 }

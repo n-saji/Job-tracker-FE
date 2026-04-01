@@ -33,6 +33,7 @@ export interface Job {
   discard_reason?: DiscardReason;
   salary_text: string;
   is_easy_apply: boolean;
+  match_rating?: number;
   applied_at: string;
   created_at: string;
   updated_at: string;
@@ -70,6 +71,9 @@ export interface ListJobsParams {
   include_discarded?: boolean;
   company?: string;
   location?: string;
+  min_match_rating?: number;
+  max_match_rating?: number;
+  sort_match?: "asc" | "desc" | "";
 }
 
 export interface JobFormInput {
@@ -84,12 +88,41 @@ export interface JobFormInput {
   discard_reason: DiscardReason | "";
   salary_text: string;
   is_easy_apply: boolean;
+  match_rating: string;
   applied_at: string;
 }
 
-export type CreateJobPayload = JobFormInput;
+export interface CreateJobPayload {
+  company_name: string;
+  role_title: string;
+  location: string;
+  job_description: string;
+  apply_link: string;
+  linkedin_job_url: string;
+  resume_link: string;
+  status: JobStatus;
+  discard_reason: DiscardReason | "";
+  salary_text: string;
+  is_easy_apply: boolean;
+  match_rating: number | null;
+  applied_at: string;
+}
 
-export type UpdateJobPayload = Partial<JobFormInput>;
+export interface UpdateJobPayload {
+  company_name?: string;
+  role_title?: string;
+  location?: string;
+  job_description?: string;
+  apply_link?: string;
+  linkedin_job_url?: string;
+  resume_link?: string;
+  status?: JobStatus;
+  discard_reason?: DiscardReason | "";
+  salary_text?: string;
+  is_easy_apply?: boolean;
+  match_rating?: number | null;
+  applied_at?: string;
+}
 
 export interface BackendErrorPayload {
   error?: {

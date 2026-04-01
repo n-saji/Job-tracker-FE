@@ -47,6 +47,9 @@ export function useJobsDashboard() {
   >("");
   const [companyFilter, setCompanyFilter] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
+  const [minMatchRatingFilter, setMinMatchRatingFilter] = useState("");
+  const [maxMatchRatingFilter, setMaxMatchRatingFilter] = useState("");
+  const [matchSort, setMatchSort] = useState<"" | "asc" | "desc">("");
   const [loadingJobs, setLoadingJobs] = useState(true);
   const [jobsError, setJobsError] = useState("");
 
@@ -93,6 +96,24 @@ export function useJobsDashboard() {
     return Math.max(1, Math.ceil(total / limit));
   }, [total, limit]);
 
+  const minMatchRatingValue = useMemo(() => {
+    const trimmed = minMatchRatingFilter.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }, [minMatchRatingFilter]);
+
+  const maxMatchRatingValue = useMemo(() => {
+    const trimmed = maxMatchRatingFilter.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }, [maxMatchRatingFilter]);
+
   const loadJobs = useCallback(async () => {
     setLoadingJobs(true);
     setJobsError("");
@@ -106,6 +127,9 @@ export function useJobsDashboard() {
         discard_reason: statusFilter === "discarded" ? discardReasonFilter : "",
         company: companyFilter,
         location: locationFilter,
+        min_match_rating: minMatchRatingValue,
+        max_match_rating: maxMatchRatingValue,
+        sort_match: matchSort,
       });
       setJobs(response.data);
       setTotal(response.total);
@@ -125,6 +149,9 @@ export function useJobsDashboard() {
     discardReasonFilter,
     limit,
     locationFilter,
+    matchSort,
+    maxMatchRatingValue,
+    minMatchRatingValue,
     page,
     showDiscardedJobs,
     statusFilter,
@@ -573,6 +600,9 @@ export function useJobsDashboard() {
     discardReasonFilter,
     companyFilter,
     locationFilter,
+    minMatchRatingFilter,
+    maxMatchRatingFilter,
+    matchSort,
     loadingJobs,
     jobsError,
     analytics,
@@ -604,6 +634,9 @@ export function useJobsDashboard() {
     setDiscardReasonFilter,
     setCompanyFilter,
     setLocationFilter,
+    setMinMatchRatingFilter,
+    setMaxMatchRatingFilter,
+    setMatchSort,
     setNotice,
     setForm,
     setFormErrors,
