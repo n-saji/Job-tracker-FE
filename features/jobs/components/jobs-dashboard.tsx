@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { Download, Edit, Moon, Sun, Trash2 } from "lucide-react";
 
 import { formatAppliedDate } from "@/lib/api/jobs";
@@ -108,6 +109,10 @@ export function JobsDashboard() {
     bulkTargetStatus,
     bulkDiscardReason,
     bulkUpdatingStatus,
+    quickStatusMenuJobId,
+    quickTargetStatus,
+    quickDiscardReason,
+    quickStatusUpdatingId,
     generatingResumeById,
     allVisibleSelected,
     selectAllRef,
@@ -128,6 +133,7 @@ export function JobsDashboard() {
     setShowBulkDeleteConfirm,
     setBulkTargetStatus,
     setBulkDiscardReason,
+    setQuickDiscardReason,
     openCreate,
     openEdit,
     closeForm,
@@ -137,6 +143,10 @@ export function JobsDashboard() {
     toggleAllVisibleJobSelections,
     onConfirmBulkDelete,
     onBulkStatusUpdate,
+    openQuickStatusMenu,
+    closeQuickStatusMenu,
+    onQuickStatusPick,
+    onQuickStatusUpdate,
     onApplyLinkClick,
     onConfirmApplied,
     applyStatusFilter,
@@ -144,6 +154,37 @@ export function JobsDashboard() {
     onGenerateResume,
     validateApplyLinkUniqueness,
   } = useJobsDashboard();
+
+  const quickStatusMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!quickStatusMenuJobId) {
+      return;
+    }
+
+    function onMouseDown(event: MouseEvent) {
+      if (
+        quickStatusMenuRef.current &&
+        !quickStatusMenuRef.current.contains(event.target as Node)
+      ) {
+        closeQuickStatusMenu();
+      }
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        closeQuickStatusMenu();
+      }
+    }
+
+    document.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [closeQuickStatusMenu, quickStatusMenuJobId]);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(120deg,#f8fafc_0%,#f1f5f9_38%,#e2e8f0_100%)] pb-12 transition-colors dark:bg-[linear-gradient(120deg,#020617_0%,#0f172a_45%,#1e293b_100%)]">
@@ -616,11 +657,94 @@ export function JobsDashboard() {
                           </div>
                         </td>
                         <td className="align-top px-4 py-4">
-                          <span
-                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusBadgeClass(job.status)}`}
+                          <div
+                            className="relative inline-block"
+                            ref={
+                              quickStatusMenuJobId === job.id
+                                ? quickStatusMenuRef
+                                : undefined
+                            }
                           >
-                            {STATUS_LABELS[job.status]}
-                          </span>
+                            <button
+                              type="button"
+                              onClick={() => openQuickStatusMenu(job.id)}
+                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold transition hover:opacity-90 ${getStatusBadgeClass(job.status)}`}
+                              aria-haspopup="menu"
+                              aria-expanded={quickStatusMenuJobId === job.id}
+                              aria-controls={`quick-status-menu-${job.id}`}
+                            >
+                              {STATUS_LABELS[job.status]}
+                            </button>
+
+                            {quickStatusMenuJobId === job.id && (
+                              <div
+                                id={`quick-status-menu-${job.id}`}
+                                role="menu"
+                                className="absolute left-0 top-full z-40 mt-2 w-52 rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-900"
+                              >
+                                <p className="px-1 pb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-300">
+                                  Quick Update Status
+                                </p>
+
+                                <div className="space-y-1">
+                                  {JOB_STATUSES.filter(
+                                    (status) => status !== job.status,
+                                  ).map((status) => (
+                                    <button
+                                      key={status}
+                                      type="button"
+                                      onClick={() => {
+                                        onQuickStatusPick(status);
+                                        if (status !== "discarded") {
+                                          void onQuickStatusUpdate(job, status);
+                                        }
+                                      }}
+                                      disabled={quickStatusUpdatingId === job.id}
+                                      className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-left text-xs font-semibold text-slate-700 transition hover:border-cyan-300 hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:border-cyan-700 dark:hover:bg-cyan-900/30"
+                                    >
+                                      {STATUS_LABELS[status]}
+                                    </button>
+                                  ))}
+                                </div>
+
+                                {quickTargetStatus === "discarded" && (
+                                  <div className="mt-2 space-y-2 border-t border-slate-200 pt-2 dark:border-slate-700">
+                                    <select
+                                      value={quickDiscardReason}
+                                      onChange={(event) => {
+                                        setQuickDiscardReason(
+                                          event.target.value as DiscardReason,
+                                        );
+                                      }}
+                                      className="h-8 w-full rounded-lg border border-slate-300 bg-white px-2 text-xs font-medium text-slate-700 outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                                    >
+                                      <option value="">Discard reason...</option>
+                                      {DISCARD_REASONS.map((reason) => (
+                                        <option key={reason} value={reason}>
+                                          {DISCARD_REASON_LABELS[reason]}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        void onQuickStatusUpdate(job, "discarded");
+                                      }}
+                                      disabled={
+                                        quickStatusUpdatingId === job.id ||
+                                        !quickDiscardReason
+                                      }
+                                      className="w-full rounded-lg border border-orange-300 px-2 py-1.5 text-xs font-semibold text-orange-700 transition hover:border-orange-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-orange-700 dark:text-orange-300"
+                                    >
+                                      {quickStatusUpdatingId === job.id
+                                        ? "Updating..."
+                                        : "Update to Discarded"}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                           {job.status === "discarded" && job.discard_reason && (
                             <p className="mt-1 text-xs font-medium text-orange-700 dark:text-orange-300">
                               Reason:{" "}

@@ -77,6 +77,18 @@ export function useJobsDashboard() {
     DiscardReason | ""
   >("");
   const [bulkUpdatingStatus, setBulkUpdatingStatus] = useState(false);
+  const [quickStatusMenuJobId, setQuickStatusMenuJobId] = useState<
+    string | null
+  >(null);
+  const [quickTargetStatus, setQuickTargetStatus] = useState<JobStatus | "">(
+    "",
+  );
+  const [quickDiscardReason, setQuickDiscardReason] = useState<
+    DiscardReason | ""
+  >("");
+  const [quickStatusUpdatingId, setQuickStatusUpdatingId] = useState<
+    string | null
+  >(null);
   const [generatingResumeById, setGeneratingResumeById] = useState<
     Record<string, boolean>
   >({});
@@ -218,6 +230,19 @@ export function useJobsDashboard() {
       setBulkDiscardReason("");
     }
   }, [selectedJobIds.length]);
+
+  useEffect(() => {
+    if (!quickStatusMenuJobId) {
+      return;
+    }
+
+    if (!jobs.some((job) => job.id === quickStatusMenuJobId)) {
+      setQuickStatusMenuJobId(null);
+      setQuickTargetStatus("");
+      setQuickDiscardReason("");
+      setQuickStatusUpdatingId(null);
+    }
+  }, [jobs, quickStatusMenuJobId]);
 
   useEffect(() => {
     if (selectAllRef.current) {
@@ -523,6 +548,68 @@ export function useJobsDashboard() {
     }
   }
 
+  function openQuickStatusMenu(jobId: string) {
+    setQuickStatusMenuJobId((currentId) => {
+      if (currentId === jobId) {
+        return null;
+      }
+      return jobId;
+    });
+    setQuickTargetStatus("");
+    setQuickDiscardReason("");
+  }
+
+  function closeQuickStatusMenu() {
+    setQuickStatusMenuJobId(null);
+    setQuickTargetStatus("");
+    setQuickDiscardReason("");
+    setQuickStatusUpdatingId(null);
+  }
+
+  function onQuickStatusPick(status: JobStatus) {
+    setQuickTargetStatus(status);
+    if (status !== "discarded") {
+      setQuickDiscardReason("");
+    }
+  }
+
+  async function onQuickStatusUpdate(job: Job, status: JobStatus) {
+    if (quickStatusUpdatingId === job.id) {
+      return;
+    }
+
+    const nextStatus = status;
+    const nextDiscardReason =
+      nextStatus === "discarded" ? quickDiscardReason : "";
+
+    if (nextStatus === "discarded" && !nextDiscardReason) {
+      setNotice({
+        kind: "error",
+        message: "Select a discard reason when updating to discarded.",
+      });
+      return;
+    }
+
+    setNotice(null);
+    setQuickStatusUpdatingId(job.id);
+    try {
+      await updateJob(job.id, {
+        status: nextStatus,
+        discard_reason: nextStatus === "discarded" ? nextDiscardReason : "",
+      });
+      setNotice({
+        kind: "success",
+        message: `Job updated to ${STATUS_LABELS[nextStatus]}.`,
+      });
+      closeQuickStatusMenu();
+      await refreshAll();
+    } catch (error) {
+      setNotice({ kind: "error", message: getApiMessage(error) });
+    } finally {
+      setQuickStatusUpdatingId(null);
+    }
+  }
+
   function onApplyLinkClick(
     event: React.MouseEvent<HTMLAnchorElement>,
     job: Job,
@@ -623,6 +710,10 @@ export function useJobsDashboard() {
     bulkTargetStatus,
     bulkDiscardReason,
     bulkUpdatingStatus,
+    quickStatusMenuJobId,
+    quickTargetStatus,
+    quickDiscardReason,
+    quickStatusUpdatingId,
     generatingResumeById,
     allVisibleSelected,
     someVisibleSelected,
@@ -645,6 +736,7 @@ export function useJobsDashboard() {
     setShowBulkDeleteConfirm,
     setBulkTargetStatus,
     setBulkDiscardReason,
+    setQuickDiscardReason,
     openCreate,
     openEdit,
     closeForm,
@@ -654,6 +746,10 @@ export function useJobsDashboard() {
     toggleAllVisibleJobSelections,
     onConfirmBulkDelete,
     onBulkStatusUpdate,
+    openQuickStatusMenu,
+    closeQuickStatusMenu,
+    onQuickStatusPick,
+    onQuickStatusUpdate,
     onApplyLinkClick,
     onConfirmApplied,
     applyStatusFilter,
