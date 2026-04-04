@@ -699,7 +699,9 @@ export function JobsDashboard() {
                                           void onQuickStatusUpdate(job, status);
                                         }
                                       }}
-                                      disabled={quickStatusUpdatingId === job.id}
+                                      disabled={
+                                        quickStatusUpdatingId === job.id
+                                      }
                                       className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-left text-xs font-semibold text-slate-700 transition hover:border-cyan-300 hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:border-cyan-700 dark:hover:bg-cyan-900/30"
                                     >
                                       {STATUS_LABELS[status]}
@@ -718,7 +720,9 @@ export function JobsDashboard() {
                                       }}
                                       className="h-8 w-full rounded-lg border border-slate-300 bg-white px-2 text-xs font-medium text-slate-700 outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
                                     >
-                                      <option value="">Discard reason...</option>
+                                      <option value="">
+                                        Discard reason...
+                                      </option>
                                       {DISCARD_REASONS.map((reason) => (
                                         <option key={reason} value={reason}>
                                           {DISCARD_REASON_LABELS[reason]}
@@ -728,7 +732,10 @@ export function JobsDashboard() {
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        void onQuickStatusUpdate(job, "discarded");
+                                        void onQuickStatusUpdate(
+                                          job,
+                                          "discarded",
+                                        );
                                       }}
                                       disabled={
                                         quickStatusUpdatingId === job.id ||
