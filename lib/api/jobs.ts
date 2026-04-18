@@ -5,9 +5,11 @@ import type {
   CreateJobPayload,
   DiscardReason,
   ExistsApplyLinkResponse,
+  ApplyRateStatsResponse,
   Job,
   JobCreatedSSEPayload,
   JobStatus,
+  ListResumesResponse,
   ListJobsParams,
   ListJobsResponse,
   ResumeGenerateTriggerResponse,
@@ -174,6 +176,10 @@ export async function listJobs(
   return requestJson<ListJobsResponse>(path);
 }
 
+export async function getApplyRateStats(): Promise<ApplyRateStatsResponse> {
+  return requestJson<ApplyRateStatsResponse>("/jobs/apply-rate");
+}
+
 export async function getJob(id: string): Promise<Job> {
   return requestJson<Job>(`/jobs/${id}`);
 }
@@ -266,6 +272,17 @@ export async function listResumeQueue(
   return requestJson<ResumeQueueListResponse>(
     `/resume-queue?${query.toString()}`,
   );
+}
+
+export async function listResumes(
+  page = 1,
+  limit = 20,
+): Promise<ListResumesResponse> {
+  const query = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+  return requestJson<ListResumesResponse>(`/resumes?${query.toString()}`);
 }
 
 export async function updateResumeLink(

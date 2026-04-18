@@ -7,6 +7,7 @@ import {
   createJob,
   deleteJob,
   existsApplyLink,
+  getApplyRateStats,
   getJob,
   listJobs,
   normalizeApplyLink,
@@ -32,8 +33,70 @@ import {
   validateFormInput,
   sleep,
 } from "@/features/jobs/utils/dashboard-utils";
-import type { Analytics, FormErrors, Notice } from "@/features/jobs/types";
+import type {
+  Analytics,
+  ApplyRateStats,
+  FormErrors,
+  Notice,
+} from "@/features/jobs/types";
 import { STATUS_LABELS } from "@/features/jobs/constants/labels";
+
+const DASHBOARD_FILTERS_STORAGE_KEY = "jobDashboardFilters";
+const LEGACY_STATUS_FILTER_STORAGE_KEY = "jobStatusFilter";
+
+type PersistedDashboardFilters = {
+  statusFilter: JobStatus | "";
+  showDiscardedJobs: boolean;
+};
+
+function isJobStatus(value: unknown): value is JobStatus {
+  return typeof value === "string" && JOB_STATUSES.includes(value as JobStatus);
+}
+
+function readPersistedDashboardFilters(): PersistedDashboardFilters {
+  const defaultFilters: PersistedDashboardFilters = {
+    statusFilter: "added",
+    showDiscardedJobs: false,
+  };
+
+  if (typeof window === "undefined") {
+    return defaultFilters;
+  }
+
+  try {
+    const raw = localStorage.getItem(DASHBOARD_FILTERS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<PersistedDashboardFilters>;
+      const nextStatus =
+        parsed.statusFilter === "" || isJobStatus(parsed.statusFilter)
+          ? parsed.statusFilter
+          : defaultFilters.statusFilter;
+      const nextShowDiscarded =
+        typeof parsed.showDiscardedJobs === "boolean"
+          ? parsed.showDiscardedJobs
+          : nextStatus === "discarded";
+
+      return {
+        statusFilter: nextStatus,
+        showDiscardedJobs: nextShowDiscarded,
+      };
+    }
+
+    const legacyStatus = localStorage.getItem(LEGACY_STATUS_FILTER_STORAGE_KEY);
+    if (legacyStatus !== null) {
+      if (legacyStatus === "" || isJobStatus(legacyStatus)) {
+        return {
+          statusFilter: legacyStatus,
+          showDiscardedJobs: legacyStatus === "discarded",
+        };
+      }
+    }
+  } catch {
+    return defaultFilters;
+  }
+
+  return defaultFilters;
+}
 
 export function useJobsDashboard() {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -41,7 +104,7 @@ export function useJobsDashboard() {
   const [limit, setLimit] = useState(20);
   const [total, setTotal] = useState(0);
   const [showDiscardedJobs, setShowDiscardedJobs] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<JobStatus | "">("");
+  const [statusFilter, setStatusFilter] = useState<JobStatus | "">("added");
   const [discardReasonFilter, setDiscardReasonFilter] = useState<
     DiscardReason | ""
   >("");
@@ -51,10 +114,20 @@ export function useJobsDashboard() {
   const [maxMatchRatingFilter, setMaxMatchRatingFilter] = useState("");
   const [matchSort, setMatchSort] = useState<"" | "asc" | "desc">("");
   const [loadingJobs, setLoadingJobs] = useState(true);
+  const [loadingMoreJobs, setLoadingMoreJobs] = useState(false);
   const [jobsError, setJobsError] = useState("");
 
   const [analytics, setAnalytics] = useState<Analytics>(analyticsSeed());
   const [loadingAnalytics, setLoadingAnalytics] = useState(true);
+  const [applyRateStats, setApplyRateStats] = useState<ApplyRateStats>({
+    daily_count: 0,
+    weekly_count: 0,
+    monthly_count: 0,
+    daily_average: 0,
+    weekly_average: 0,
+    monthly_average: 0,
+  });
+  const [loadingApplyRateStats, setLoadingApplyRateStats] = useState(true);
 
   const [notice, setNotice] = useState<Notice | null>(null);
 
@@ -95,6 +168,8 @@ export function useJobsDashboard() {
 
   const refreshAllRef = useRef<(() => Promise<void>) | null>(null);
   const selectAllRef = useRef<HTMLInputElement | null>(null);
+  const successNoticeTimerRef = useRef<number | null>(null);
+  const hasRestoredFiltersRef = useRef(false);
 
   const allVisibleSelected =
     jobs.length > 0 && jobs.every((job) => selectedJobIds.includes(job.id));
@@ -126,8 +201,19 @@ export function useJobsDashboard() {
     return Number.isFinite(parsed) ? parsed : undefined;
   }, [maxMatchRatingFilter]);
 
+  function mergeJobs(existingJobs: Job[], nextJobs: Job[]): Job[] {
+    if (existingJobs.length === 0) {
+      return nextJobs;
+    }
+
+    const seenIds = new Set(existingJobs.map((job) => job.id));
+    return [...existingJobs, ...nextJobs.filter((job) => !seenIds.has(job.id))];
+  }
+
   const loadJobs = useCallback(async () => {
-    setLoadingJobs(true);
+    const isAppendingPage = page > 1;
+    setLoadingJobs(!isAppendingPage);
+    setLoadingMoreJobs(isAppendingPage);
     setJobsError("");
 
     try {
@@ -143,13 +229,70 @@ export function useJobsDashboard() {
         max_match_rating: maxMatchRatingValue,
         sort_match: matchSort,
       });
-      setJobs(response.data);
+      setJobs((currentJobs) =>
+        isAppendingPage ? mergeJobs(currentJobs, response.data) : response.data,
+      );
       setTotal(response.total);
       if (response.page !== page) {
         setPage(response.page);
       }
       if (response.limit !== limit) {
         setLimit(response.limit);
+      }
+    } catch (error) {
+      setJobsError(getApiMessage(error));
+    } finally {
+      setLoadingJobs(false);
+      setLoadingMoreJobs(false);
+    }
+  }, [
+    companyFilter,
+    discardReasonFilter,
+    limit,
+    locationFilter,
+    matchSort,
+    maxMatchRatingValue,
+    minMatchRatingValue,
+    page,
+    showDiscardedJobs,
+    statusFilter,
+  ]);
+
+  const reloadVisibleJobs = useCallback(async () => {
+    setLoadingJobs(true);
+    setLoadingMoreJobs(false);
+    setJobsError("");
+
+    try {
+      const pages = Array.from({ length: page }, (_, index) => index + 1);
+      const responses = await Promise.all(
+        pages.map((targetPage) =>
+          listJobs({
+            page: targetPage,
+            limit,
+            include_discarded: showDiscardedJobs,
+            status: statusFilter,
+            discard_reason:
+              statusFilter === "discarded" ? discardReasonFilter : "",
+            company: companyFilter,
+            location: locationFilter,
+            min_match_rating: minMatchRatingValue,
+            max_match_rating: maxMatchRatingValue,
+            sort_match: matchSort,
+          }),
+        ),
+      );
+
+      const mergedJobs = responses.flatMap((response) => response.data);
+      setJobs(mergedJobs);
+      setTotal(responses[0]?.total ?? 0);
+
+      const lastResponse = responses[responses.length - 1];
+      if (lastResponse && lastResponse.page !== page) {
+        setPage(lastResponse.page);
+      }
+      if (lastResponse && lastResponse.limit !== limit) {
+        setLimit(lastResponse.limit);
       }
     } catch (error) {
       setJobsError(getApiMessage(error));
@@ -206,17 +349,63 @@ export function useJobsDashboard() {
     }
   }, []);
 
+  const loadApplyRateStats = useCallback(async () => {
+    setLoadingApplyRateStats(true);
+    try {
+      const stats = await getApplyRateStats();
+      setApplyRateStats(stats);
+    } catch {
+      setApplyRateStats({
+        daily_count: 0,
+        weekly_count: 0,
+        monthly_count: 0,
+        daily_average: 0,
+        weekly_average: 0,
+        monthly_average: 0,
+      });
+    } finally {
+      setLoadingApplyRateStats(false);
+    }
+  }, []);
+
   const refreshAll = useCallback(async () => {
-    await Promise.all([loadJobs(), loadAnalytics()]);
-  }, [loadAnalytics, loadJobs]);
+    await Promise.all([
+      reloadVisibleJobs(),
+      loadAnalytics(),
+      loadApplyRateStats(),
+    ]);
+  }, [loadAnalytics, loadApplyRateStats, reloadVisibleJobs]);
 
   useEffect(() => {
     void loadJobs();
   }, [loadJobs]);
 
   useEffect(() => {
+    if (typeof window === "undefined" || !hasRestoredFiltersRef.current) {
+      return;
+    }
+
+    localStorage.setItem(
+      DASHBOARD_FILTERS_STORAGE_KEY,
+      JSON.stringify({ statusFilter, showDiscardedJobs }),
+    );
+    localStorage.setItem(LEGACY_STATUS_FILTER_STORAGE_KEY, statusFilter);
+  }, [showDiscardedJobs, statusFilter]);
+
+  useEffect(() => {
+    const persistedFilters = readPersistedDashboardFilters();
+    setStatusFilter(persistedFilters.statusFilter);
+    setShowDiscardedJobs(persistedFilters.showDiscardedJobs);
+    hasRestoredFiltersRef.current = true;
+  }, []);
+
+  useEffect(() => {
     void loadAnalytics();
   }, [loadAnalytics]);
+
+  useEffect(() => {
+    void loadApplyRateStats();
+  }, [loadApplyRateStats]);
 
   useEffect(() => {
     setSelectedJobIds((prev) =>
@@ -263,6 +452,36 @@ export function useJobsDashboard() {
 
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    if (notice?.kind !== "success") {
+      return;
+    }
+
+    if (successNoticeTimerRef.current !== null) {
+      window.clearTimeout(successNoticeTimerRef.current);
+    }
+
+    successNoticeTimerRef.current = window.setTimeout(() => {
+      setNotice((current) => (current?.kind === "success" ? null : current));
+      successNoticeTimerRef.current = null;
+    }, 3000);
+
+    return () => {
+      if (successNoticeTimerRef.current !== null) {
+        window.clearTimeout(successNoticeTimerRef.current);
+        successNoticeTimerRef.current = null;
+      }
+    };
+  }, [notice]);
+
+  async function preserveScrollPositionWhile(action: () => Promise<void>) {
+    const currentScrollY = window.scrollY;
+    await action();
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: currentScrollY, behavior: "auto" });
+    });
+  }
 
   function closeForm() {
     setIsFormOpen(false);
@@ -439,7 +658,7 @@ export function useJobsDashboard() {
       }
 
       closeForm();
-      await refreshAll();
+      await preserveScrollPositionWhile(refreshAll);
     } catch (error) {
       setFormErrors({ form: getApiMessage(error) });
     } finally {
@@ -458,7 +677,7 @@ export function useJobsDashboard() {
     try {
       await deleteJob(id);
       setNotice({ kind: "success", message: "Job application deleted." });
-      await refreshAll();
+      await preserveScrollPositionWhile(refreshAll);
     } catch (error) {
       setNotice({ kind: "error", message: getApiMessage(error) });
     } finally {
@@ -499,7 +718,7 @@ export function useJobsDashboard() {
       });
       setSelectedJobIds([]);
       setShowBulkDeleteConfirm(false);
-      await refreshAll();
+      await preserveScrollPositionWhile(refreshAll);
     } catch (error) {
       setNotice({ kind: "error", message: getApiMessage(error) });
     } finally {
@@ -540,7 +759,7 @@ export function useJobsDashboard() {
       setSelectedJobIds([]);
       setBulkTargetStatus("");
       setBulkDiscardReason("");
-      await refreshAll();
+      await preserveScrollPositionWhile(refreshAll);
     } catch (error) {
       setNotice({ kind: "error", message: getApiMessage(error) });
     } finally {
@@ -602,7 +821,7 @@ export function useJobsDashboard() {
         message: `Job updated to ${STATUS_LABELS[nextStatus]}.`,
       });
       closeQuickStatusMenu();
-      await refreshAll();
+      await preserveScrollPositionWhile(refreshAll);
     } catch (error) {
       setNotice({ kind: "error", message: getApiMessage(error) });
     } finally {
@@ -637,7 +856,7 @@ export function useJobsDashboard() {
         message: "Job marked as applied with current date and time.",
       });
       setApplyConfirmJob(null);
-      await refreshAll();
+      await preserveScrollPositionWhile(refreshAll);
     } catch (error) {
       setNotice({ kind: "error", message: getApiMessage(error) });
     } finally {
@@ -649,15 +868,8 @@ export function useJobsDashboard() {
     nextStatus: JobStatus | "",
     source: "card" | "control" = "control",
   ) {
-    const effectiveShowDiscarded =
-      source === "card" ? nextStatus === "discarded" : showDiscardedJobs;
-
     if (source === "card") {
-      setShowDiscardedJobs(effectiveShowDiscarded);
-    }
-
-    if (!effectiveShowDiscarded && nextStatus === "discarded") {
-      return;
+      setShowDiscardedJobs(nextStatus === "discarded");
     }
 
     setPage(1);
@@ -691,9 +903,12 @@ export function useJobsDashboard() {
     maxMatchRatingFilter,
     matchSort,
     loadingJobs,
+    loadingMoreJobs,
     jobsError,
     analytics,
     loadingAnalytics,
+    applyRateStats,
+    loadingApplyRateStats,
     notice,
     isFormOpen,
     isCreateMode,

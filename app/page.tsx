@@ -1,5 +1,5 @@
-import { JobsDashboard } from "@/features/jobs/components/jobs-dashboard";
+import { redirect } from "next/navigation";
 
 export default function HomePage() {
-  return <JobsDashboard />;
+  redirect("/jobs");
 }

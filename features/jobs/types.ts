@@ -11,3 +11,12 @@ export type Analytics = {
   total: number;
   byStatus: Record<JobStatus, number>;
 };
+
+export type ApplyRateStats = {
+  daily_count: number;
+  weekly_count: number;
+  monthly_count: number;
+  daily_average: number;
+  weekly_average: number;
+  monthly_average: number;
+};

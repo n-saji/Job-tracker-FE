@@ -1,22 +1,20 @@
 import { useEffect, useState } from "react";
 
 export function useTheme() {
-  // Keep the first render deterministic to avoid SSR/client hydration mismatches.
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    if (typeof window === "undefined") {
+      return "light";
+    }
 
-  useEffect(() => {
     const storedTheme = window.localStorage.getItem("job-tracker-theme");
-    const preferredTheme =
-      storedTheme === "light" || storedTheme === "dark"
-        ? storedTheme
-        : window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "light";
+    if (storedTheme === "light" || storedTheme === "dark") {
+      return storedTheme;
+    }
 
-    setTheme((prevTheme) =>
-      prevTheme === preferredTheme ? prevTheme : preferredTheme,
-    );
-  }, []);
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  });
 
   useEffect(() => {
     const root = document.documentElement;
@@ -31,5 +29,5 @@ export function useTheme() {
     setTheme((prevTheme) => (prevTheme === "light" ? "dark" : "light"));
   }
 
-  return { theme, toggleTheme };
+  return { theme, setTheme, toggleTheme };
 }

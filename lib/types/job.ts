@@ -63,6 +63,15 @@ export interface BulkUpdateJobsStatusResponse {
   updated_count: number;
 }
 
+export interface ApplyRateStatsResponse {
+  daily_count: number;
+  weekly_count: number;
+  monthly_count: number;
+  daily_average: number;
+  weekly_average: number;
+  monthly_average: number;
+}
+
 export interface ListJobsParams {
   page?: number;
   limit?: number;
@@ -141,6 +150,23 @@ export interface ResumeQueueItem {
 
 export interface ResumeQueueListResponse {
   data: ResumeQueueItem[];
+}
+
+export interface ResumeItem {
+  job_id: string;
+  company_name: string;
+  role_title: string;
+  status: JobStatus;
+  resume_link: string;
+  applied_at: string;
+  updated_at: string;
+}
+
+export interface ListResumesResponse {
+  data: ResumeItem[];
+  page: number;
+  limit: number;
+  total: number;
 }
 
 export interface ResumeGenerateTriggerResponse {
