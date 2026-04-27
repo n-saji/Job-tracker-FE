@@ -573,21 +573,10 @@ export function JobsDashboard() {
                             aria-label={`Select ${job.company_name} ${job.role_title}`}
                           />
                           <div className="min-w-0">
-                            <div className="mb-2 flex flex-wrap gap-2 text-xs">
-                              <span className="rounded-xl bg-emerald-100 px-2.5 py-1 font-semibold text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200">
-                                Added {formatAppliedDate(job.created_at)}
-                              </span>
-                              {job.is_easy_apply && (
-                                <span className="rounded-xl bg-cyan-100 px-2.5 py-1 font-semibold text-cyan-900 dark:bg-cyan-900/40 dark:text-cyan-200">
-                                  Easy Apply
-                                </span>
-                              )}
-                            </div>
-
-                            <p className="line-clamp-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-white md:text-4xl">
+                            <p className="line-clamp-2 text-xl font-bold tracking-tight text-slate-900 dark:text-white md:text-xl">
                               {job.role_title}
                             </p>
-                            <p className="mt-0.5 line-clamp-1 text-base text-slate-700 dark:text-slate-300">
+                            <p className="mt-0.5 line-clamp-1 text-base text-slate-700 dark:text-slate-300 text-sm">
                               {job.company_name}
                             </p>
                           </div>
@@ -691,7 +680,7 @@ export function JobsDashboard() {
                         )}
                       </div>
 
-                      <div className="mt-2 grid gap-2 border-y border-slate-200 py-2 text-sm dark:border-slate-700 md:grid-cols-3">
+                      <div className="mt-2 grid gap-2 border-y border-slate-200 py-2 text-sm dark:border-slate-700 md:grid-cols-4">
                         <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200">
                           <MapPin className="h-4 w-4" aria-hidden="true" />
                           <span className="line-clamp-1">
@@ -712,6 +701,16 @@ export function JobsDashboard() {
                           <span className="line-clamp-1">
                             {getJobTimelineLabel(job)}
                           </span>
+                        </div>
+                        <div className="flex gap-2 text-xs">
+                          <span className="rounded-xl bg-emerald-100 px-2.5 py-1 font-semibold text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200">
+                            Added {formatAppliedDate(job.created_at)}
+                          </span>
+                          {job.is_easy_apply && (
+                            <span className="rounded-xl bg-cyan-100 px-2.5 py-1 font-semibold text-cyan-900 dark:bg-cyan-900/40 dark:text-cyan-200">
+                              Easy Apply
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -788,8 +787,11 @@ export function JobsDashboard() {
                             disabled={deletingId === job.id}
                             className="inline-flex items-center gap-1 rounded-full border border-rose-300 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:border-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            
-                            {deletingId === job.id ? <Loader2 className="h-4 w-4" aria-hidden="true" /> : <Trash2 className="h-4 w-4" aria-hidden="true" />}
+                            {deletingId === job.id ? (
+                              <Loader2 className="h-4 w-4" aria-hidden="true" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" aria-hidden="true" />
+                            )}
                           </button>
                         </div>
                       </div>
