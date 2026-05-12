@@ -256,9 +256,7 @@ export function StatisticsPage() {
                 Total jobs funnel map
               </h3>
             </div>
-            <p className="rounded-full bg-cyan-100 px-3 py-1 text-xs font-semibold text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300">
-              Total → Applied / Discarded / Withdrawn → Interview → Offer
-            </p>
+            
           </div>
 
           <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200 bg-white/90 p-4 dark:border-slate-700 dark:bg-slate-950/70">

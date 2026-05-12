@@ -559,7 +559,8 @@ export function JobsDashboard() {
               jobs.map((job) => (
                 <article
                   key={job.id}
-                  className="overflow-hidden rounded-3xl border border-cyan-300/60 bg-white/95 shadow-sm transition hover:border-cyan-300 hover:shadow-md dark:border-cyan-700/60 dark:bg-slate-900/90"
+                  className={`overflow-hidden rounded-3xl border bg-white/95 shadow-sm transition hover:border-cyan-300 hover:shadow-md dark:bg-slate-900/90
+                  ${selectedJobIds.includes(job.id) ? "border-cyan-600" : "border-cyan-300/60 dark:border-cyan-700/60"}`}
                 >
                   <div className="grid lg:grid-cols-[1fr_280px]">
                     <div className="px-3 pb-2 pt-2 sm:px-4 sm:pb-3 sm:pt-3">
@@ -576,7 +577,7 @@ export function JobsDashboard() {
                             <p className="line-clamp-2 text-xl font-bold tracking-tight text-slate-900 dark:text-white md:text-xl">
                               {job.role_title}
                             </p>
-                            <p className="mt-0.5 line-clamp-1 text-base text-slate-700 dark:text-slate-300 text-sm">
+                            <p className="mt-0.5 line-clamp-1 text-slate-700 dark:text-slate-300 text-sm">
                               {job.company_name}
                             </p>
                           </div>
