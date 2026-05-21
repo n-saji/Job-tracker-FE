@@ -15,12 +15,22 @@ import { formatAppliedDate } from "@/lib/api/jobs";
 import {
   DISCARD_REASONS,
   JOB_STATUSES,
+  JOB_VERDICTS,
+  SCORE_FIELDS,
   type DiscardReason,
   type Job,
+  type JobExtractedData,
+  type JobSectionScores,
+  type JobVerdict,
   type JobStatus,
+  type ScoreField,
 } from "@/lib/types/job";
 import {
+  EMPLOYMENT_TYPE_LABELS,
   DISCARD_REASON_LABELS,
+  SCORE_FIELD_LABELS,
+  SPONSORSHIP_LABELS,
+  VERDICT_LABELS,
   STATUS_LABELS,
 } from "@/features/jobs/constants/labels";
 import { useJobsDashboard } from "@/features/jobs/hooks/use-jobs-dashboard";
@@ -110,6 +120,80 @@ function formatApplyAverage(value: number): string {
   return value.toFixed(2);
 }
 
+function getVerdictBadgeClass(verdict: JobVerdict): string {
+  if (verdict === "REJECT") {
+    return "bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:border-rose-700";
+  }
+  if (verdict === "REVIEW") {
+    return "bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-700";
+  }
+  return "bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-700";
+}
+
+function getEmploymentTypeBadgeClass(
+  value: JobExtractedData["employment_type"],
+): string {
+  if (value === "contract") {
+    return "bg-violet-100 text-violet-800 border border-violet-200 dark:bg-violet-900/40 dark:text-violet-300 dark:border-violet-700";
+  }
+  if (value === "internship") {
+    return "bg-sky-100 text-sky-800 border border-sky-200 dark:bg-sky-900/40 dark:text-sky-300 dark:border-sky-700";
+  }
+  if (value === "part_time") {
+    return "bg-cyan-100 text-cyan-800 border border-cyan-200 dark:bg-cyan-900/40 dark:text-cyan-300 dark:border-cyan-700";
+  }
+  if (value === "unclear") {
+    return "bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600";
+  }
+  return "bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-700";
+}
+
+function getScoreValue(
+  scoreScores: JobSectionScores | undefined,
+  field: ScoreField,
+): number | undefined {
+  if (!scoreScores) {
+    return undefined;
+  }
+
+  if (field === "skills_match") {
+    return scoreScores.skills_match;
+  }
+  if (field === "years_of_experience") {
+    return scoreScores.years_of_experience;
+  }
+  if (field === "location") {
+    return scoreScores.location;
+  }
+  if (field === "title_alignment") {
+    return scoreScores.title_alignment;
+  }
+  if (field === "employment_type") {
+    return scoreScores.employment_type;
+  }
+  if (field === "domain_relevance") {
+    return scoreScores.domain_relevance;
+  }
+
+  return undefined;
+}
+
+function formatScoreFieldLabel(field: ScoreField): string {
+  return SCORE_FIELD_LABELS[field];
+}
+
+function formatSponsorshipLabel(
+  value: JobExtractedData["sponsorship_stance"],
+): string {
+  return SPONSORSHIP_LABELS[value];
+}
+
+function formatEmploymentTypeLabel(
+  value: JobExtractedData["employment_type"],
+): string {
+  return EMPLOYMENT_TYPE_LABELS[value];
+}
+
 function getJobTimelineLabel(job: Job): string {
   if (job.applied_at) {
     return `Applied ${formatAppliedDate(job.applied_at)}`;
@@ -128,9 +212,14 @@ export function JobsDashboard() {
     discardReasonFilter,
     companyFilter,
     locationFilter,
+    verdictFilter,
     minMatchRatingFilter,
     maxMatchRatingFilter,
     matchSort,
+    scoreFieldFilter,
+    scoreMinFilter,
+    scoreMaxFilter,
+    scoreSort,
     loadingJobs,
     jobsError,
     analytics,
@@ -167,9 +256,14 @@ export function JobsDashboard() {
     setDiscardReasonFilter,
     setCompanyFilter,
     setLocationFilter,
+    setVerdictFilter,
     setMinMatchRatingFilter,
     setMaxMatchRatingFilter,
     setMatchSort,
+    setScoreFieldFilter,
+    setScoreMinFilter,
+    setScoreMaxFilter,
+    setScoreSort,
     setNotice,
     setForm,
     setFormErrors,
@@ -728,6 +822,92 @@ export function JobsDashboard() {
                         </p>
                       )}
 
+                      {(job.verdict ||
+                        typeof job.total_score === "number" ||
+                        job.reject_reason ||
+                        job.flags?.length ||
+                        job.extracted) && (
+                        <div className="mt-3 space-y-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+                          <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                            {job.verdict && (
+                              <span
+                                className={`inline-flex rounded-full px-2.5 py-1 ${getVerdictBadgeClass(job.verdict)}`}
+                              >
+                                Verdict: {VERDICT_LABELS[job.verdict]}
+                              </span>
+                            )}
+                            {typeof job.total_score === "number" && (
+                              <span className="inline-flex rounded-full border border-cyan-200 bg-cyan-100 px-2.5 py-1 text-cyan-900 dark:border-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-200">
+                                Score: {job.total_score}/100
+                              </span>
+                            )}
+                            {job.reject_reason && (
+                              <span className="inline-flex rounded-full border border-orange-200 bg-orange-100 px-2.5 py-1 text-orange-900 dark:border-orange-700 dark:bg-orange-900/40 dark:text-orange-200">
+                                Reject: {job.reject_reason}
+                              </span>
+                            )}
+                          </div>
+
+                          {job.extracted && (
+                            <div className="flex flex-wrap gap-2 text-[11px] font-semibold">
+                              {job.extracted.required_yoe && (
+                                <span className="rounded-full border border-slate-200 bg-white px-2 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                                  YOE: {job.extracted.required_yoe}
+                                </span>
+                              )}
+                              <span className="rounded-full border border-slate-200 bg-white px-2 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                                {formatSponsorshipLabel(
+                                  job.extracted.sponsorship_stance,
+                                )}
+                              </span>
+                              <span
+                                className={`rounded-full px-2 py-1 ${getEmploymentTypeBadgeClass(job.extracted.employment_type)}`}
+                              >
+                                {formatEmploymentTypeLabel(
+                                  job.extracted.employment_type,
+                                )}
+                              </span>
+                              <span className="rounded-full border border-slate-200 bg-white px-2 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                                {job.extracted.work_location.toUpperCase()}
+                              </span>
+                            </div>
+                          )}
+
+                          {job.extracted?.primary_stack?.length ? (
+                            <div className="flex flex-wrap gap-1.5">
+                              {job.extracted.primary_stack
+                                .slice(0, 8)
+                                .map((skill) => (
+                                  <span
+                                    key={skill}
+                                    className="rounded-full bg-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-100"
+                                  >
+                                    {skill}
+                                  </span>
+                                ))}
+                              {job.extracted.primary_stack.length > 8 && (
+                                <span className="rounded-full bg-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-100">
+                                  +{job.extracted.primary_stack.length - 8} more
+                                </span>
+                              )}
+                            </div>
+                          ) : null}
+
+                          {job.flags?.length ? (
+                            <div className="flex flex-wrap gap-1.5">
+                              {job.flags.map((flag) => (
+                                <span
+                                  key={flag}
+                                  className="rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-700 dark:border-rose-700 dark:bg-rose-900/30 dark:text-rose-200"
+                                >
+                                  {flag}
+                                </span>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
+
                       <div className="mt-2 flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 pt-2 dark:border-slate-700">
                         <div className="flex flex-wrap items-center gap-2">
                           <a
@@ -908,6 +1088,103 @@ export function JobsDashboard() {
               </label>
 
               <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+                Verdict
+                <select
+                  value={verdictFilter}
+                  onChange={(event) => {
+                    setPage(1);
+                    setVerdictFilter(event.target.value as JobVerdict | "");
+                  }}
+                  className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                >
+                  <option value="">All verdicts</option>
+                  {JOB_VERDICTS.map((verdict) => (
+                    <option key={verdict} value={verdict}>
+                      {VERDICT_LABELS[verdict]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+                Score field
+                <select
+                  value={scoreFieldFilter}
+                  onChange={(event) => {
+                    setPage(1);
+                    const nextField = event.target.value as ScoreField | "";
+                    setScoreFieldFilter(nextField);
+                    if (!nextField) {
+                      setScoreMinFilter("");
+                      setScoreMaxFilter("");
+                      setScoreSort("");
+                    }
+                  }}
+                  className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                >
+                  <option value="">No score filter</option>
+                  {SCORE_FIELDS.map((field) => (
+                    <option key={field} value={field}>
+                      {formatScoreFieldLabel(field)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+                Score min
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={scoreMinFilter}
+                  onChange={(event) => {
+                    setPage(1);
+                    setScoreMinFilter(event.target.value);
+                  }}
+                  disabled={!scoreFieldFilter}
+                  placeholder="0"
+                  className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none ring-cyan-300 transition focus:ring disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+                Score max
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={scoreMaxFilter}
+                  onChange={(event) => {
+                    setPage(1);
+                    setScoreMaxFilter(event.target.value);
+                  }}
+                  disabled={!scoreFieldFilter}
+                  placeholder="100"
+                  className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none ring-cyan-300 transition focus:ring disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+                Score sort
+                <select
+                  value={scoreSort}
+                  onChange={(event) => {
+                    setPage(1);
+                    setScoreSort(event.target.value as "" | "asc" | "desc");
+                  }}
+                  disabled={!scoreFieldFilter}
+                  className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 outline-none ring-cyan-300 transition focus:ring disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                >
+                  <option value="">Default</option>
+                  <option value="desc">Highest first</option>
+                  <option value="asc">Lowest first</option>
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
                 Match min
                 <input
                   type="number"
@@ -1039,6 +1316,144 @@ export function JobsDashboard() {
                   : "N/A"}
               </div>
             </div>
+
+            {(detailJob.verdict ||
+              typeof detailJob.total_score === "number" ||
+              detailJob.section_scores ||
+              detailJob.extracted ||
+              detailJob.flags?.length) && (
+              <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/50">
+                <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                  {detailJob.verdict && (
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-1 ${getVerdictBadgeClass(detailJob.verdict)}`}
+                    >
+                      Verdict: {VERDICT_LABELS[detailJob.verdict]}
+                    </span>
+                  )}
+                  {typeof detailJob.total_score === "number" && (
+                    <span className="inline-flex rounded-full border border-cyan-200 bg-cyan-100 px-2.5 py-1 text-cyan-900 dark:border-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-200">
+                      Total Score: {detailJob.total_score}/100
+                    </span>
+                  )}
+                  {detailJob.reject_reason && (
+                    <span className="inline-flex rounded-full border border-orange-200 bg-orange-100 px-2.5 py-1 text-orange-900 dark:border-orange-700 dark:bg-orange-900/40 dark:text-orange-200">
+                      Reject: {detailJob.reject_reason}
+                    </span>
+                  )}
+                </div>
+
+                {detailJob.section_scores && (
+                  <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+                    {(SCORE_FIELDS as ScoreField[]).map((field) => {
+                      const value = getScoreValue(
+                        detailJob.section_scores,
+                        field,
+                      );
+                      if (typeof value !== "number") {
+                        return null;
+                      }
+
+                      return (
+                        <div
+                          key={field}
+                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                        >
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-300">
+                            {formatScoreFieldLabel(field)}
+                          </p>
+                          <p className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">
+                            {value}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {detailJob.extracted && (
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-300">
+                        Required YOE
+                      </p>
+                      <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+                        {detailJob.extracted.required_yoe || "Not mentioned"}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-300">
+                        Sponsorship
+                      </p>
+                      <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+                        {formatSponsorshipLabel(
+                          detailJob.extracted.sponsorship_stance,
+                        )}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-300">
+                        Employment Type
+                      </p>
+                      <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+                        {formatEmploymentTypeLabel(
+                          detailJob.extracted.employment_type,
+                        )}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-300">
+                        Work Location
+                      </p>
+                      <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+                        {detailJob.extracted.work_location}
+                        {detailJob.extracted.location_state
+                          ? ` • ${detailJob.extracted.location_state}`
+                          : ""}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 md:col-span-2 dark:border-slate-700 dark:bg-slate-900">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-300">
+                        Primary Stack
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {detailJob.extracted.primary_stack.length ? (
+                          detailJob.extracted.primary_stack.map((skill) => (
+                            <span
+                              key={skill}
+                              className="rounded-full bg-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-100"
+                            >
+                              {skill}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-sm text-slate-500 dark:text-slate-300">
+                            No skills extracted.
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {detailJob.flags?.length ? (
+                      <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 md:col-span-2 dark:border-slate-700 dark:bg-slate-900">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-300">
+                          Flags
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {detailJob.flags.map((flag) => (
+                            <span
+                              key={flag}
+                              className="rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-700 dark:border-rose-700 dark:bg-rose-900/30 dark:text-rose-200"
+                            >
+                              {flag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="mt-4">
               <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-300">

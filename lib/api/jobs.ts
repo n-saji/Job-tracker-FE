@@ -57,6 +57,9 @@ function buildQuery(params: ListJobsParams): string {
   if (params.location?.trim()) {
     query.set("location", params.location.trim());
   }
+  if (params.verdict) {
+    query.set("verdict", params.verdict);
+  }
   if (typeof params.min_match_rating === "number") {
     query.set("min_match_rating", String(params.min_match_rating));
   }
@@ -65,6 +68,18 @@ function buildQuery(params: ListJobsParams): string {
   }
   if (params.sort_match) {
     query.set("sort_match", params.sort_match);
+  }
+  if (params.score_field) {
+    query.set("score_field", params.score_field);
+  }
+  if (typeof params.score_min === "number") {
+    query.set("score_min", String(params.score_min));
+  }
+  if (typeof params.score_max === "number") {
+    query.set("score_max", String(params.score_max));
+  }
+  if (params.score_sort) {
+    query.set("score_sort", params.score_sort);
   }
 
   return query.toString();

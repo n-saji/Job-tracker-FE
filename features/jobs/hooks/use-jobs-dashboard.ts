@@ -17,10 +17,12 @@ import {
 } from "@/lib/api/jobs";
 import {
   JOB_STATUSES,
+  type JobVerdict,
   type DiscardReason,
   type Job,
   type JobFormInput,
   type JobStatus,
+  type ScoreField,
 } from "@/lib/types/job";
 import {
   analyticsSeed,
@@ -110,9 +112,14 @@ export function useJobsDashboard() {
   >("");
   const [companyFilter, setCompanyFilter] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
+  const [verdictFilter, setVerdictFilter] = useState<JobVerdict | "">("");
   const [minMatchRatingFilter, setMinMatchRatingFilter] = useState("");
   const [maxMatchRatingFilter, setMaxMatchRatingFilter] = useState("");
   const [matchSort, setMatchSort] = useState<"" | "asc" | "desc">("");
+  const [scoreFieldFilter, setScoreFieldFilter] = useState<ScoreField | "">("");
+  const [scoreMinFilter, setScoreMinFilter] = useState("");
+  const [scoreMaxFilter, setScoreMaxFilter] = useState("");
+  const [scoreSort, setScoreSort] = useState<"" | "asc" | "desc">("");
   const [loadingJobs, setLoadingJobs] = useState(true);
   const [loadingMoreJobs, setLoadingMoreJobs] = useState(false);
   const [jobsError, setJobsError] = useState("");
@@ -201,6 +208,24 @@ export function useJobsDashboard() {
     return Number.isFinite(parsed) ? parsed : undefined;
   }, [maxMatchRatingFilter]);
 
+  const scoreMinValue = useMemo(() => {
+    const trimmed = scoreMinFilter.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }, [scoreMinFilter]);
+
+  const scoreMaxValue = useMemo(() => {
+    const trimmed = scoreMaxFilter.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }, [scoreMaxFilter]);
+
   function mergeJobs(existingJobs: Job[], nextJobs: Job[]): Job[] {
     if (existingJobs.length === 0) {
       return nextJobs;
@@ -222,12 +247,17 @@ export function useJobsDashboard() {
         limit,
         include_discarded: showDiscardedJobs,
         status: statusFilter,
+        verdict: verdictFilter,
         discard_reason: statusFilter === "discarded" ? discardReasonFilter : "",
         company: companyFilter,
         location: locationFilter,
         min_match_rating: minMatchRatingValue,
         max_match_rating: maxMatchRatingValue,
         sort_match: matchSort,
+        score_field: scoreFieldFilter,
+        score_min: scoreMinValue,
+        score_max: scoreMaxValue,
+        score_sort: scoreSort,
       });
       setJobs((currentJobs) =>
         isAppendingPage ? mergeJobs(currentJobs, response.data) : response.data,
@@ -253,7 +283,12 @@ export function useJobsDashboard() {
     matchSort,
     maxMatchRatingValue,
     minMatchRatingValue,
+    scoreFieldFilter,
+    scoreMaxValue,
+    scoreMinValue,
+    scoreSort,
     page,
+    verdictFilter,
     showDiscardedJobs,
     statusFilter,
   ]);
@@ -272,6 +307,7 @@ export function useJobsDashboard() {
             limit,
             include_discarded: showDiscardedJobs,
             status: statusFilter,
+            verdict: verdictFilter,
             discard_reason:
               statusFilter === "discarded" ? discardReasonFilter : "",
             company: companyFilter,
@@ -279,6 +315,10 @@ export function useJobsDashboard() {
             min_match_rating: minMatchRatingValue,
             max_match_rating: maxMatchRatingValue,
             sort_match: matchSort,
+            score_field: scoreFieldFilter,
+            score_min: scoreMinValue,
+            score_max: scoreMaxValue,
+            score_sort: scoreSort,
           }),
         ),
       );
@@ -307,7 +347,12 @@ export function useJobsDashboard() {
     matchSort,
     maxMatchRatingValue,
     minMatchRatingValue,
+    scoreFieldFilter,
+    scoreMaxValue,
+    scoreMinValue,
+    scoreSort,
     page,
+    verdictFilter,
     showDiscardedJobs,
     statusFilter,
   ]);
@@ -902,6 +947,11 @@ export function useJobsDashboard() {
     minMatchRatingFilter,
     maxMatchRatingFilter,
     matchSort,
+    verdictFilter,
+    scoreFieldFilter,
+    scoreMinFilter,
+    scoreMaxFilter,
+    scoreSort,
     loadingJobs,
     loadingMoreJobs,
     jobsError,
@@ -940,9 +990,14 @@ export function useJobsDashboard() {
     setDiscardReasonFilter,
     setCompanyFilter,
     setLocationFilter,
+    setVerdictFilter,
     setMinMatchRatingFilter,
     setMaxMatchRatingFilter,
     setMatchSort,
+    setScoreFieldFilter,
+    setScoreMinFilter,
+    setScoreMaxFilter,
+    setScoreSort,
     setNotice,
     setForm,
     setFormErrors,

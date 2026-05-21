@@ -16,9 +16,51 @@ export const DISCARD_REASONS = [
   "less_experience",
   "citizenship",
   "not_fit",
+  "sponsorship",
+  "primary_stack_mismatch",
 ] as const;
 
 export type DiscardReason = (typeof DISCARD_REASONS)[number];
+
+export const JOB_VERDICTS = ["APPLY", "REVIEW", "REJECT"] as const;
+
+export type JobVerdict = (typeof JOB_VERDICTS)[number];
+
+export const SCORE_FIELDS = [
+  "total_score",
+  "skills_match",
+  "years_of_experience",
+  "location",
+  "title_alignment",
+  "employment_type",
+  "domain_relevance",
+] as const;
+
+export type ScoreField = (typeof SCORE_FIELDS)[number];
+
+export interface JobSectionScores {
+  skills_match: number;
+  years_of_experience: number;
+  location: number;
+  title_alignment: number;
+  employment_type: number;
+  domain_relevance: number;
+}
+
+export interface JobExtractedData {
+  required_yoe: string;
+  sponsorship_stance: "sponsors" | "opt_ok" | "no_sponsorship" | "unclear";
+  primary_stack: string[];
+  work_location: "remote" | "hybrid" | "onsite";
+  location_state: string;
+  employment_type:
+    | "full_time"
+    | "contract"
+    | "part_time"
+    | "internship"
+    | "unclear";
+  job_domain: string;
+}
 
 export interface Job {
   id: string;
@@ -31,6 +73,12 @@ export interface Job {
   resume_link: string;
   status: JobStatus;
   discard_reason?: DiscardReason;
+  verdict?: JobVerdict;
+  total_score?: number;
+  section_scores?: JobSectionScores;
+  extracted?: JobExtractedData;
+  reject_reason?: string;
+  flags?: string[];
   salary_text: string;
   is_easy_apply: boolean;
   match_rating?: number;
@@ -80,9 +128,14 @@ export interface ListJobsParams {
   include_discarded?: boolean;
   company?: string;
   location?: string;
+  verdict?: JobVerdict | "";
   min_match_rating?: number;
   max_match_rating?: number;
   sort_match?: "asc" | "desc" | "";
+  score_field?: ScoreField | "";
+  score_min?: number;
+  score_max?: number;
+  score_sort?: "asc" | "desc" | "";
 }
 
 export interface JobFormInput {
@@ -95,6 +148,12 @@ export interface JobFormInput {
   resume_link: string;
   status: JobStatus;
   discard_reason: DiscardReason | "";
+  verdict?: JobVerdict | "";
+  total_score?: number | null;
+  section_scores?: JobSectionScores | null;
+  extracted?: JobExtractedData | null;
+  reject_reason?: string | null;
+  flags?: string[];
   salary_text: string;
   is_easy_apply: boolean;
   match_rating: string;
@@ -111,6 +170,12 @@ export interface CreateJobPayload {
   resume_link: string;
   status: JobStatus;
   discard_reason: DiscardReason | "";
+  verdict?: JobVerdict | "";
+  total_score?: number | null;
+  section_scores?: JobSectionScores | null;
+  extracted?: JobExtractedData | null;
+  reject_reason?: string | null;
+  flags?: string[];
   salary_text: string;
   is_easy_apply: boolean;
   match_rating: number | null;
@@ -127,6 +192,12 @@ export interface UpdateJobPayload {
   resume_link?: string;
   status?: JobStatus;
   discard_reason?: DiscardReason | "";
+  verdict?: JobVerdict | "";
+  total_score?: number | null;
+  section_scores?: JobSectionScores | null;
+  extracted?: JobExtractedData | null;
+  reject_reason?: string | null;
+  flags?: string[];
   salary_text?: string;
   is_easy_apply?: boolean;
   match_rating?: number | null;
