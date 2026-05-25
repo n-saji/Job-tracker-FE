@@ -1346,7 +1346,7 @@ export function JobsDashboard() {
 
                 {detailJob.section_scores && (
                   <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-                    {(SCORE_FIELDS as ScoreField[]).map((field) => {
+                    {SCORE_FIELDS.map((field) => {
                       const value = getScoreValue(
                         detailJob.section_scores,
                         field,
