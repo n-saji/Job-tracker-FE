@@ -248,6 +248,7 @@ export function JobsDashboard() {
     quickDiscardReason,
     quickStatusUpdatingId,
     generatingResumeById,
+    jobsListRef,
     allVisibleSelected,
     selectAllRef,
     setPage,
@@ -295,7 +296,6 @@ export function JobsDashboard() {
 
   const quickStatusMenuRef = useRef<HTMLDivElement | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
-  const jobsListRef = useRef<HTMLDivElement | null>(null);
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
   const [detailJob, setDetailJob] = useState<Job | null>(null);
 
@@ -653,6 +653,7 @@ export function JobsDashboard() {
               jobs.map((job) => (
                 <article
                   key={job.id}
+                  data-job-id={job.id}
                   className={`overflow-hidden rounded-3xl border bg-white/95 shadow-sm transition hover:border-cyan-300 hover:shadow-md dark:bg-slate-900/90
                   ${selectedJobIds.includes(job.id) ? "border-cyan-600" : "border-cyan-300/60 dark:border-cyan-700/60"}`}
                 >
@@ -1273,8 +1274,8 @@ export function JobsDashboard() {
       )}
 
       {detailJob && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/60 p-4">
-          <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/60 p-4 max-h-screen">
+          <div className="w-full max-w-3xl h-[90%] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-300">
