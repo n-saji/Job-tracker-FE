@@ -58,8 +58,8 @@ function MatchRatingPanel({ rating }: { rating: number }) {
   const textGradient = `linear-gradient(155deg, ${accentColor} 0%, ${baseColor} 52%, ${glowColor} 100%)`;
 
   return (
-    <div className="flex h-full flex-col items-center justify-center rounded-3xl p-3">
-      <div className="mx-auto relative inline-flex h-24 w-24 items-center justify-center">
+    <div className="flex h-32 flex-col items-center justify-center rounded-3xl p-3">
+      <div className="mx-auto relative inline-flex h-full w-full items-center justify-center">
         <svg
           width={size}
           height={size}
@@ -99,7 +99,7 @@ function MatchRatingPanel({ rating }: { rating: number }) {
             strokeDashoffset={dashOffset}
             style={{
               stroke: `url(#${ringGradientId})`,
-              filter: `drop-shadow(0 0 8px color-mix(in srgb, ${baseColor} 55%, transparent))`,
+              // filter: `drop-shadow(0 0 8px color-mix(in srgb, ${baseColor} 55%, transparent))`,
             }}
             className="transition-all duration-500"
           />
@@ -655,7 +655,7 @@ export function JobsDashboard() {
                   key={job.id}
                   data-job-id={job.id}
                   className={`overflow-hidden rounded-3xl border bg-white/95 shadow-sm transition hover:border-cyan-300 hover:shadow-md dark:bg-slate-900/90
-                  ${selectedJobIds.includes(job.id) ? "border-cyan-600" : "border-cyan-300/60 dark:border-cyan-700/60"}`}
+                  ${selectedJobIds.includes(job.id) ? "border-cyan-400" : "border-cyan-300/60 dark:border-cyan-700/60"}`}
                 >
                   <div className="grid lg:grid-cols-[1fr_280px]">
                     <div className="px-3 pb-2 pt-2 sm:px-4 sm:pb-3 sm:pt-3">
@@ -810,11 +810,11 @@ export function JobsDashboard() {
                         </div>
                       </div>
 
-                      {job.job_description.trim() && (
+                      {/* {job.job_description.trim() && (
                         <p className="mt-2 line-clamp-2 overflow-hidden text-sm leading-6 text-slate-600 dark:text-slate-300">
                           {job.job_description}
                         </p>
-                      )}
+                      )} */}
 
                       {job.status === "discarded" && job.discard_reason && (
                         <p className="mt-2 text-xs font-semibold text-orange-700 dark:text-orange-300">
@@ -828,20 +828,20 @@ export function JobsDashboard() {
                         job.reject_reason ||
                         job.flags?.length ||
                         job.extracted) && (
-                        <div className="mt-3 space-y-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+                        <div className="mt-1 space-y-2 rounded-2xl">
                           <div className="flex flex-wrap gap-2 text-xs font-semibold">
-                            {job.verdict && (
+                            {/* {job.verdict && (
                               <span
                                 className={`inline-flex rounded-full px-2.5 py-1 ${getVerdictBadgeClass(job.verdict)}`}
                               >
                                 Verdict: {VERDICT_LABELS[job.verdict]}
                               </span>
-                            )}
-                            {typeof job.total_score === "number" && (
+                            )} */}
+                            {/* {typeof job.total_score === "number" && (
                               <span className="inline-flex rounded-full border border-cyan-200 bg-cyan-100 px-2.5 py-1 text-cyan-900 dark:border-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-200">
                                 Score: {job.total_score}/100
                               </span>
-                            )}
+                            )} */}
                             {job.reject_reason && (
                               <span className="inline-flex rounded-full border border-orange-200 bg-orange-100 px-2.5 py-1 text-orange-900 dark:border-orange-700 dark:bg-orange-900/40 dark:text-orange-200">
                                 Reject: {job.reject_reason}
@@ -869,6 +869,7 @@ export function JobsDashboard() {
                                 )}
                               </span>
                               <span className="rounded-full border border-slate-200 bg-white px-2 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                                Location:{" "}
                                 {job.extracted.work_location.toUpperCase()}
                               </span>
                             </div>
@@ -980,8 +981,17 @@ export function JobsDashboard() {
                     </div>
 
                     <div className="border-t border-slate-200 lg:border-l lg:border-t-0 dark:border-slate-700">
-                      <div className="h-full min-h-44 p-2">
+                      <div className="h-full min-h-44 p-2 flex flex-col items-center justify-center gap-2 ">
                         <MatchRatingPanel rating={job.match_rating ?? 0} />
+                        <div>
+                          {job.verdict && (
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-1 ${getVerdictBadgeClass(job.verdict)} text-xs font-semibold`}
+                            >
+                              Verdict: {VERDICT_LABELS[job.verdict]}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
