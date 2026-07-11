@@ -665,11 +665,12 @@ export function JobsDashboard() {
                             type="checkbox"
                             checked={selectedJobIds.includes(job.id)}
                             onChange={() => toggleJobSelection(job.id)}
-                            className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-cyan-300 dark:border-slate-500 dark:bg-slate-800"
+                            className="mt-1 h-5 w-5 rounded border-slate-300 text-slate-900 focus:ring-cyan-300 dark:border-slate-500 dark:bg-slate-800"
                             aria-label={`Select ${job.company_name} ${job.role_title}`}
                           />
-                          <div className="min-w-0">
-                            <p className="line-clamp-2 text-xl font-bold tracking-tight text-slate-900 dark:text-white md:text-xl">
+                          <div className="min-w-0" >
+                            <p className="line-clamp-2 text-xl font-bold tracking-tight text-slate-900 dark:text-white md:text-xl"
+                            >
                               {job.role_title}
                             </p>
                             <p className="mt-0.5 line-clamp-1 text-slate-700 dark:text-slate-300 text-sm">
