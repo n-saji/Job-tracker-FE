@@ -16,6 +16,10 @@ import {
   updateJob,
 } from "@/lib/api/jobs";
 import {
+  bulkCreateApplications,
+  createApplication,
+} from "@/lib/api/applications";
+import {
   JOB_STATUSES,
   type JobVerdict,
   type DiscardReason,
@@ -179,6 +183,10 @@ export function useJobsDashboard() {
   const [generatingResumeById, setGeneratingResumeById] = useState<
     Record<string, boolean>
   >({});
+  const [applyingJobIds, setApplyingJobIds] = useState<Record<string, boolean>>(
+    {},
+  );
+  const [bulkApplying, setBulkApplying] = useState(false);
 
   const jobsListRef = useRef<HTMLDivElement | null>(null);
   const refreshAllRef = useRef<(() => Promise<void>) | null>(null);
@@ -733,6 +741,51 @@ export function useJobsDashboard() {
     }
   }
 
+  async function onAutoApply(job: Job) {
+    if (applyingJobIds[job.id]) {
+      return;
+    }
+
+    setNotice(null);
+    setApplyingJobIds((prev) => ({ ...prev, [job.id]: true }));
+    try {
+      await createApplication(job.id, "review");
+      setNotice({
+        kind: "success",
+        message: `Application queued for ${job.role_title} at ${job.company_name}. Check the Applications page for progress.`,
+      });
+    } catch (error) {
+      setNotice({ kind: "error", message: getApiMessage(error) });
+    } finally {
+      setApplyingJobIds((prev) => {
+        const next = { ...prev };
+        delete next[job.id];
+        return next;
+      });
+    }
+  }
+
+  async function onAutoApplySelected() {
+    if (selectedJobIds.length === 0 || bulkApplying) {
+      return;
+    }
+
+    setNotice(null);
+    setBulkApplying(true);
+    try {
+      const response = await bulkCreateApplications(selectedJobIds, "review");
+      setNotice({
+        kind: "success",
+        message: `Queued ${response.created} of ${selectedJobIds.length} selected job(s) for auto-apply. Check the Applications page for progress.`,
+      });
+      setSelectedJobIds([]);
+    } catch (error) {
+      setNotice({ kind: "error", message: getApiMessage(error) });
+    } finally {
+      setBulkApplying(false);
+    }
+  }
+
   async function onSubmitForm(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setNotice(null);
@@ -1065,6 +1118,8 @@ export function useJobsDashboard() {
     quickDiscardReason,
     quickStatusUpdatingId,
     generatingResumeById,
+    applyingJobIds,
+    bulkApplying,
     jobsListRef,
     allVisibleSelected,
     someVisibleSelected,
@@ -1111,6 +1166,8 @@ export function useJobsDashboard() {
     applyStatusFilter,
     getSummaryCardClass,
     onGenerateResume,
+    onAutoApply,
+    onAutoApplySelected,
     validateApplyLinkUniqueness,
   };
 }

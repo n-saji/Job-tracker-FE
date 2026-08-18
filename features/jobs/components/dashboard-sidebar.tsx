@@ -2,10 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, BriefcaseBusiness, FileText, Settings } from "lucide-react";
+import {
+  BarChart3,
+  Bot,
+  BriefcaseBusiness,
+  FileText,
+  Settings,
+} from "lucide-react";
 
 const navItems = [
   { href: "/jobs", label: "Jobs", icon: BriefcaseBusiness },
+  { href: "/applications", label: "Applications", icon: Bot },
   { href: "/resumes", label: "Resumes", icon: FileText },
   { href: "/statistics", label: "Statistics", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings },

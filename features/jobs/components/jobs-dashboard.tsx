@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  Bot,
   CalendarDays,
   Download,
   Edit,
@@ -248,6 +249,8 @@ export function JobsDashboard() {
     quickDiscardReason,
     quickStatusUpdatingId,
     generatingResumeById,
+    applyingJobIds,
+    bulkApplying,
     jobsListRef,
     allVisibleSelected,
     selectAllRef,
@@ -291,6 +294,8 @@ export function JobsDashboard() {
     onConfirmApplied,
     applyStatusFilter,
     onGenerateResume,
+    onAutoApply,
+    onAutoApplySelected,
     validateApplyLinkUniqueness,
   } = useJobsDashboard();
 
@@ -575,6 +580,15 @@ export function JobsDashboard() {
                   className="h-9 rounded-lg border border-cyan-300 px-3 text-sm font-semibold text-cyan-700 transition hover:border-cyan-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-cyan-700 dark:text-cyan-300 dark:hover:border-cyan-500"
                 >
                   {bulkUpdatingStatus ? "Updating..." : "Update Status"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void onAutoApplySelected()}
+                  disabled={bulkApplying}
+                  className="inline-flex h-9 items-center gap-1 rounded-lg bg-cyan-500 px-3 text-sm font-bold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Bot className="h-4 w-4" aria-hidden="true" />
+                  {bulkApplying ? "Queuing..." : "Auto Apply Selected"}
                 </button>
                 <button
                   type="button"
@@ -951,6 +965,22 @@ export function JobsDashboard() {
                                 : "Generate Resume"}
                             </button>
                           ) : null}
+                          <button
+                            type="button"
+                            onClick={() => void onAutoApply(job)}
+                            disabled={Boolean(applyingJobIds[job.id])}
+                            className="inline-flex items-center gap-1 rounded-full bg-slate-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400"
+                          >
+                            {applyingJobIds[job.id] ? (
+                              <Loader2
+                                className="h-4 w-4 animate-spin"
+                                aria-hidden="true"
+                              />
+                            ) : (
+                              <Bot className="h-4 w-4" aria-hidden="true" />
+                            )}
+                            Auto Apply
+                          </button>
                           <button
                             type="button"
                             onClick={() => setDetailJob(job)}
