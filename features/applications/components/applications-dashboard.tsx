@@ -9,7 +9,6 @@ import type {
 } from "@/lib/types/application";
 import { ACTIVE_APPLICATION_STATUSES } from "@/lib/types/application";
 import { useApplicationsDashboard } from "@/features/applications/hooks/use-applications-dashboard";
-import { JobBoardAccountsPanel } from "@/features/applications/components/job-board-accounts-panel";
 import {
   APPLICATION_STATUS_LABELS,
   getApplicationStatusBadgeClass,
@@ -38,7 +37,7 @@ function eventTone(eventType: string): "success" | "warning" | "error" | "neutra
   if (/FAILED|UNAVAILABLE/.test(eventType)) {
     return "error";
   }
-  if (/REQUIRES_HUMAN|SKIPPED|CANCELLED/.test(eventType)) {
+  if (/REQUIRES_HUMAN|SKIPPED|CANCELLED|CAPTCHA|BOT_BLOCK/.test(eventType)) {
     return "warning";
   }
   if (/SUBMITTED|AWAITING_REVIEW|ANSWERED|FILLED|SYNCED/.test(eventType)) {
@@ -254,8 +253,6 @@ export function ApplicationsDashboard() {
         )}
 
         <section className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 lg:px-8">
-          <JobBoardAccountsPanel />
-
           {loading ? (
             <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />

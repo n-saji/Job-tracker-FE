@@ -1,10 +1,6 @@
 import { API_BASE_URL, ApiError } from "@/lib/api/jobs";
 import type { BackendErrorPayload } from "@/lib/types/job";
-import type {
-  Application,
-  ApplicationEvent,
-  BulkCreateApplicationsResponse,
-} from "@/lib/types/application";
+import type { Application, ApplicationEvent } from "@/lib/types/application";
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -40,26 +36,6 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return (await response.json()) as T;
-}
-
-export async function createApplication(
-  jobId: string,
-  mode = "review",
-): Promise<Application> {
-  return requestJson<Application>("/applications/", {
-    method: "POST",
-    body: JSON.stringify({ job_id: jobId, mode }),
-  });
-}
-
-export async function bulkCreateApplications(
-  jobIds: string[],
-  mode = "review",
-): Promise<BulkCreateApplicationsResponse> {
-  return requestJson<BulkCreateApplicationsResponse>("/applications/bulk", {
-    method: "POST",
-    body: JSON.stringify({ job_ids: jobIds, mode }),
-  });
 }
 
 export async function listApplications(): Promise<Application[]> {

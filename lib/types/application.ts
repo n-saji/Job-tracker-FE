@@ -1,7 +1,6 @@
 export const APPLICATION_STATUSES = [
   "QUEUED",
   "RUNNING",
-  "FORM_FILLED",
   "AWAITING_REVIEW",
   "SUBMITTED",
   "FAILED",
@@ -11,9 +10,14 @@ export const APPLICATION_STATUSES = [
 
 export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
 
+// RUNNING: the extension is actively filling the tab. AWAITING_REVIEW: the
+// extension reached the final step and is waiting on the user to submit —
+// still worth polling for, since the extension reports SUBMITTED itself the
+// moment it detects the user did.
 export const ACTIVE_APPLICATION_STATUSES: ApplicationStatus[] = [
   "QUEUED",
   "RUNNING",
+  "AWAITING_REVIEW",
 ];
 
 export interface Application {
@@ -25,11 +29,6 @@ export interface Application {
   screenshot_path?: string | null;
   company_name: string;
   role_title: string;
-}
-
-export interface BulkCreateApplicationsResponse {
-  created: number;
-  application_ids: string[];
 }
 
 export interface ApplicationEvent {

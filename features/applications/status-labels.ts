@@ -3,7 +3,6 @@ import type { ApplicationStatus } from "@/lib/types/application";
 export const APPLICATION_STATUS_LABELS: Record<ApplicationStatus, string> = {
   QUEUED: "Queued",
   RUNNING: "Running",
-  FORM_FILLED: "Form Filled",
   AWAITING_REVIEW: "Awaiting Review",
   SUBMITTED: "Submitted",
   FAILED: "Failed",
@@ -18,7 +17,6 @@ export function getApplicationStatusBadgeClass(
     case "SUBMITTED":
       return "bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-700";
     case "AWAITING_REVIEW":
-    case "FORM_FILLED":
       return "bg-sky-100 text-sky-700 border border-sky-200 dark:bg-sky-900/40 dark:text-sky-300 dark:border-sky-700";
     case "RUNNING":
       return "bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-700";

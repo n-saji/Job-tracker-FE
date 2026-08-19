@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  Bot,
   CalendarDays,
   Download,
   Edit,
@@ -249,8 +248,6 @@ export function JobsDashboard() {
     quickDiscardReason,
     quickStatusUpdatingId,
     generatingResumeById,
-    applyingJobIds,
-    bulkApplying,
     jobsListRef,
     allVisibleSelected,
     selectAllRef,
@@ -294,8 +291,6 @@ export function JobsDashboard() {
     onConfirmApplied,
     applyStatusFilter,
     onGenerateResume,
-    onAutoApply,
-    onAutoApplySelected,
     validateApplyLinkUniqueness,
   } = useJobsDashboard();
 
@@ -583,15 +578,6 @@ export function JobsDashboard() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => void onAutoApplySelected()}
-                  disabled={bulkApplying}
-                  className="inline-flex h-9 items-center gap-1 rounded-lg bg-cyan-500 px-3 text-sm font-bold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <Bot className="h-4 w-4" aria-hidden="true" />
-                  {bulkApplying ? "Queuing..." : "Auto Apply Selected"}
-                </button>
-                <button
-                  type="button"
                   onClick={() => setShowBulkDeleteConfirm(true)}
                   className="inline-flex h-9 items-center gap-1 rounded-lg border border-rose-200 px-3 text-sm font-semibold text-rose-700 transition hover:border-rose-400"
                 >
@@ -689,6 +675,12 @@ export function JobsDashboard() {
                             </p>
                             <p className="mt-0.5 line-clamp-1 text-slate-700 dark:text-slate-300 text-sm">
                               {job.company_name}
+                              {job.company_size && (
+                                <span className="text-slate-400 dark:text-slate-500">
+                                  {" "}
+                                  · {job.company_size}
+                                </span>
+                              )}
                             </p>
                           </div>
                         </div>
@@ -965,22 +957,6 @@ export function JobsDashboard() {
                                 : "Generate Resume"}
                             </button>
                           ) : null}
-                          <button
-                            type="button"
-                            onClick={() => void onAutoApply(job)}
-                            disabled={Boolean(applyingJobIds[job.id])}
-                            className="inline-flex items-center gap-1 rounded-full bg-slate-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400"
-                          >
-                            {applyingJobIds[job.id] ? (
-                              <Loader2
-                                className="h-4 w-4 animate-spin"
-                                aria-hidden="true"
-                              />
-                            ) : (
-                              <Bot className="h-4 w-4" aria-hidden="true" />
-                            )}
-                            Auto Apply
-                          </button>
                           <button
                             type="button"
                             onClick={() => setDetailJob(job)}
@@ -1346,6 +1322,10 @@ export function JobsDashboard() {
               <div className="rounded-lg bg-slate-100/80 px-3 py-2 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                 <span className="font-semibold">Status:</span>{" "}
                 {STATUS_LABELS[detailJob.status]}
+              </div>
+              <div className="rounded-lg bg-slate-100/80 px-3 py-2 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                <span className="font-semibold">Company Size:</span>{" "}
+                {detailJob.company_size || "Unknown"}
               </div>
               <div className="rounded-lg bg-slate-100/80 px-3 py-2 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                 <span className="font-semibold">Added:</span>{" "}
@@ -1753,6 +1733,21 @@ export function JobsDashboard() {
                       setForm((prev) => ({
                         ...prev,
                         salary_text: event.target.value,
+                      }))
+                    }
+                    placeholder="Optional"
+                    className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none ring-cyan-300 transition focus:ring dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                  />
+                </label>
+
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Company Size
+                  <input
+                    value={form.company_size}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        company_size: event.target.value,
                       }))
                     }
                     placeholder="Optional"

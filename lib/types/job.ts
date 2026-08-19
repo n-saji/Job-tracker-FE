@@ -65,6 +65,7 @@ export interface JobExtractedData {
 export interface Job {
   id: string;
   company_name: string;
+  company_size?: string;
   role_title: string;
   location: string;
   job_description: string;
@@ -140,6 +141,7 @@ export interface ListJobsParams {
 
 export interface JobFormInput {
   company_name: string;
+  company_size: string;
   role_title: string;
   location: string;
   job_description: string;
@@ -162,6 +164,7 @@ export interface JobFormInput {
 
 export interface CreateJobPayload {
   company_name: string;
+  company_size?: string;
   role_title: string;
   location: string;
   job_description: string;
@@ -184,6 +187,7 @@ export interface CreateJobPayload {
 
 export interface UpdateJobPayload {
   company_name?: string;
+  company_size?: string;
   role_title?: string;
   location?: string;
   job_description?: string;

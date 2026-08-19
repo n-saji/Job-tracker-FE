@@ -18,6 +18,7 @@ import type { Analytics, FormErrors } from "@/features/jobs/types";
 export function buildEmptyForm(): JobFormInput {
   return {
     company_name: "",
+    company_size: "",
     role_title: "",
     location: "",
     job_description: "",
@@ -36,6 +37,7 @@ export function buildEmptyForm(): JobFormInput {
 export function formFromJob(job: Job): JobFormInput {
   return {
     company_name: job.company_name,
+    company_size: job.company_size ?? "",
     role_title: job.role_title,
     location: job.location,
     job_description: job.job_description,
@@ -148,6 +150,7 @@ export function buildCreatePayload(value: JobFormInput): CreateJobPayload {
 
   return {
     company_name: value.company_name.trim(),
+    company_size: value.company_size.trim() || undefined,
     role_title: value.role_title.trim(),
     location: value.location.trim(),
     job_description: value.job_description.trim(),
@@ -173,6 +176,7 @@ export function buildUpdatePayload(
 
   const withTrim = {
     company_name: value.company_name.trim(),
+    company_size: value.company_size.trim(),
     role_title: value.role_title.trim(),
     location: value.location.trim(),
     job_description: value.job_description.trim(),
@@ -189,6 +193,9 @@ export function buildUpdatePayload(
 
   if (withTrim.company_name !== current.company_name) {
     payload.company_name = withTrim.company_name;
+  }
+  if (withTrim.company_size !== (current.company_size ?? "")) {
+    payload.company_size = withTrim.company_size;
   }
   if (withTrim.role_title !== current.role_title) {
     payload.role_title = withTrim.role_title;
